@@ -137,16 +137,77 @@
             50% { background-color: rgba(255, 193, 7, 0.1); }
             100% { background-color: transparent; }
         }
+        .timer-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(255, 255, 255, 0.95);
+            padding: 15px;
+            border-radius: 10px;
+            box-shadow: 0 2px 15px rgba(0,0,0,0.1);
+            z-index: 1000;
+            text-align: center;
+            min-width: 200px;
+        }
+        .countdown-ring {
+            position: relative;
+            width: 60px;
+            height: 60px;
+            margin: 0 auto 10px;
+        }
+        .countdown-circle {
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
+        }
+        .countdown-circle circle {
+            stroke-dasharray: 283;
+            stroke-dashoffset: 0;
+            fill: none;
+            stroke-width: 4;
+        }
+        .countdown-circle .progress {
+            stroke: #28a745;
+            transition: stroke-dashoffset 0.1s linear;
+        }
+        .countdown-circle .bg {
+            stroke: #e9ecef;
+        }
+        .countdown-number {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: 1.2em;
+            font-weight: bold;
+            color: #28a745;
+        }
+        .next-check-time {
+            font-size: 0.9em;
+            color: #666;
+            margin-top: 5px;
+        }
     </style>
 </head>
 <body>
     <div class="container mt-5">
         <h1 class="text-center mb-4">Bad Bunny Ticket Monitor</h1>
+        
+        <div class="timer-container">
+            <div class="countdown-ring">
+                <svg class="countdown-circle" width="60" height="60">
+                    <circle class="bg" cx="30" cy="30" r="25"/>
+                    <circle class="progress" cx="30" cy="30" r="25"/>
+                </svg>
+                <div class="countdown-number">15</div>
+            </div>
+            <div>Next Check In</div>
+            <div class="next-check-time" id="nextCheckTime"></div>
+        </div>
+
         <div class="alert alert-info text-center">
             Monitoring Ticketera for Bad Bunny ticket availability
             <div class="mt-2">
                 <small>Auto-refreshing every 15 seconds</small>
-                <span class="next-check" id="nextCheck"></span>
             </div>
         </div>
         <div id="mainEventContainer"></div>
@@ -219,16 +280,41 @@
         }
 
         function updateCountdown() {
-            const countdownElement = document.getElementById('countdown');
+            const countdownNumber = document.querySelector('.countdown-number');
+            const progressCircle = document.querySelector('.progress');
+            const circumference = 2 * Math.PI * 25; // r=25
             let seconds = 15;
             
             if (countdownInterval) {
                 clearInterval(countdownInterval);
             }
             
+            // Update next check time
+            const now = new Date();
+            const nextCheck = new Date(now.getTime() + CHECK_INTERVAL);
+            document.getElementById('nextCheckTime').textContent = 
+                nextCheck.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            
             countdownInterval = setInterval(() => {
                 seconds--;
-                countdownElement.textContent = seconds;
+                
+                // Update number
+                countdownNumber.textContent = seconds;
+                
+                // Update progress circle
+                const offset = circumference * (1 - seconds / 15);
+                progressCircle.style.strokeDasharray = circumference;
+                progressCircle.style.strokeDashoffset = offset;
+                
+                // Change color based on time remaining
+                if (seconds <= 5) {
+                    progressCircle.style.stroke = '#dc3545';
+                    countdownNumber.style.color = '#dc3545';
+                } else if (seconds <= 10) {
+                    progressCircle.style.stroke = '#ffc107';
+                    countdownNumber.style.color = '#ffc107';
+                }
+                
                 if (seconds <= 0) {
                     clearInterval(countdownInterval);
                 }
