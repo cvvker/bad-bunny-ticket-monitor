@@ -9,14 +9,62 @@
             transition: all 0.3s ease;
             position: relative;
             overflow: hidden;
+            border: none;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
         .ticket-card:hover {
             transform: translateY(-5px);
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.15);
         }
         .status-badge {
-            font-size: 0.9em;
-            padding: 5px 10px;
+            font-size: 1em;
+            padding: 8px 12px;
+            border-radius: 20px;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+        .badge.alert-success {
+            background-color: #28a745 !important;
+            color: white;
+            animation: pulse 2s infinite;
+        }
+        .badge.alert-warning {
+            background-color: #ffc107 !important;
+            color: #000;
+            animation: pulse 2s infinite;
+        }
+        .badge.alert-info {
+            background-color: #17a2b8 !important;
+            color: white;
+        }
+        .badge.alert-danger {
+            background-color: #dc3545 !important;
+            color: white;
+            animation: shake 0.82s cubic-bezier(.36,.07,.19,.97) both infinite;
+        }
+        .status-alert {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 8px;
+            height: 100%;
+            transition: background-color 0.3s ease;
+        }
+        .status-alert.alert-success {
+            background-color: #28a745;
+            box-shadow: 0 0 10px rgba(40, 167, 69, 0.5);
+        }
+        .status-alert.alert-warning {
+            background-color: #ffc107;
+            box-shadow: 0 0 10px rgba(255, 193, 7, 0.5);
+        }
+        .status-alert.alert-danger {
+            background-color: #dc3545;
+            box-shadow: 0 0 10px rgba(220, 53, 69, 0.5);
+        }
+        .status-alert.alert-info {
+            background-color: #17a2b8;
+            box-shadow: 0 0 10px rgba(23, 162, 184, 0.5);
         }
         .last-checked {
             font-size: 0.8em;
@@ -36,39 +84,6 @@
             border-radius: 5px;
             color: #198754;
             font-weight: bold;
-        }
-        .status-alert {
-            position: absolute;
-            top: 0;
-            right: 0;
-            width: 10px;
-            height: 100%;
-            transition: background-color 0.3s ease;
-        }
-        .alert-success {
-            background-color: #28a745;
-            animation: pulse 2s infinite;
-        }
-        .alert-warning {
-            background-color: #ffc107;
-        }
-        .alert-danger {
-            background-color: #dc3545;
-        }
-        .alert-info {
-            background-color: #17a2b8;
-        }
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.5; }
-            100% { opacity: 1; }
-        }
-        .status-change {
-            animation: highlight 1s ease-in-out;
-        }
-        @keyframes highlight {
-            0% { background-color: rgba(40, 167, 69, 0.2); }
-            100% { background-color: transparent; }
         }
         .notification-toggle {
             position: fixed;
@@ -109,6 +124,19 @@
             border-radius: 10px;
             box-shadow: 0 2px 10px rgba(0,0,0,0.1);
         }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
+        }
+        .status-change {
+            animation: highlight 2s ease-in-out;
+        }
+        @keyframes highlight {
+            0% { background-color: rgba(255, 193, 7, 0.3); }
+            50% { background-color: rgba(255, 193, 7, 0.1); }
+            100% { background-color: transparent; }
+        }
     </style>
 </head>
 <body>
@@ -141,8 +169,8 @@
             <button class="btn btn-primary mb-2" onclick="toggleSound()" id="soundToggle">
                 🔔 Sound Alerts: ON
             </button>
-            <button class="btn btn-secondary mb-2" onclick="playAlertSound()" id="testSound">
-                🔊 Test Sound
+            <button class="btn btn-secondary mb-2" onclick="testNotifications()" id="testSound">
+                🔊 Test Alerts
             </button>
             <div class="check-countdown">
                 Next check in: <span id="countdown">15</span>s
@@ -151,24 +179,42 @@
     </div>
 
     <audio id="alertSound" preload="auto">
-        <source src="https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3" type="audio/mpeg">
+        <source src="https://cdn.freesound.org/previews/573/573343_11861866-lq.mp3" type="audio/mpeg">
     </audio>
 
     <script>
-        let soundEnabled = true;
+        let soundEnabled = localStorage.getItem('soundEnabled') !== 'false';
         let previousStates = {};
         let countdownInterval;
         const CHECK_INTERVAL = 15000; // 15 seconds
 
         function toggleSound() {
             soundEnabled = !soundEnabled;
+            localStorage.setItem('soundEnabled', soundEnabled);
+            updateSoundButton();
+        }
+
+        function updateSoundButton() {
             document.getElementById('soundToggle').innerHTML = 
                 soundEnabled ? '🔔 Sound Alerts: ON' : '🔕 Sound Alerts: OFF';
+            document.getElementById('soundToggle').classList.toggle('btn-primary', soundEnabled);
+            document.getElementById('soundToggle').classList.toggle('btn-secondary', !soundEnabled);
         }
 
         function playAlertSound() {
             if (soundEnabled) {
-                document.getElementById('alertSound').play();
+                const audio = document.getElementById('alertSound');
+                audio.currentTime = 0;
+                audio.play().catch(e => console.log('Error playing sound:', e));
+            }
+        }
+
+        function testNotifications() {
+            playAlertSound();
+            const testCard = document.querySelector('.ticket-card');
+            if (testCard) {
+                testCard.classList.add('urgent-alert');
+                setTimeout(() => testCard.classList.remove('urgent-alert'), 3000);
             }
         }
 
@@ -189,11 +235,73 @@
             }, 1000);
         }
 
+        async function updateDisplay() {
+            try {
+                const response = await fetch('/api/tickets');
+                const tickets = await response.json();
+                
+                for (const [id, ticket] of Object.entries(tickets)) {
+                    const previousStatus = previousStates[id]?.status;
+                    const currentStatus = ticket.status;
+                    
+                    if (previousStatus && previousStatus !== currentStatus) {
+                        if (currentStatus.toLowerCase().includes('available') || 
+                            currentStatus.toLowerCase().includes('check now')) {
+                            playAlertSound();
+                        }
+                    }
+                    
+                    previousStates[id] = { ...ticket };
+                }
+
+                // Update UI sections
+                document.getElementById('mainEventContainer').innerHTML = 
+                    createEventCard('main_page', tickets['main_page'], true);
+
+                const julyEvents = Object.entries(tickets)
+                    .filter(([id]) => id.startsWith('jul_'))
+                    .map(([id, event]) => createEventCard(id, event))
+                    .join('');
+                document.getElementById('julyEvents').innerHTML = julyEvents;
+
+                const augustEvents = Object.entries(tickets)
+                    .filter(([id]) => id.startsWith('aug_'))
+                    .map(([id, event]) => createEventCard(id, event))
+                    .join('');
+                document.getElementById('augustEvents').innerHTML = augustEvents;
+
+                const septemberEvents = Object.entries(tickets)
+                    .filter(([id]) => id.startsWith('sep_'))
+                    .map(([id, event]) => createEventCard(id, event))
+                    .join('');
+                document.getElementById('septemberEvents').innerHTML = septemberEvents;
+
+                updateCountdown();
+                
+            } catch (error) {
+                console.error('Error updating display:', error);
+            }
+        }
+
         function createEventCard(id, event, isMainEvent) {
-            const alertClass = event.status.toLowerCase().includes('available') ? 'alert-success' : 
-                             event.status.toLowerCase().includes('check') ? 'alert-warning' : 'alert-info';
-            const isUrgent = event.status.toLowerCase().includes('available') || 
-                           event.status.toLowerCase().includes('check now');
+            let alertClass, statusText;
+            
+            // Determine status type and text
+            if (event.status.toLowerCase().includes('available')) {
+                alertClass = 'alert-success';
+                statusText = '🎫 TICKETS AVAILABLE!';
+            } else if (event.status.toLowerCase().includes('check now')) {
+                alertClass = 'alert-danger';
+                statusText = '⚡ CHECK NOW!';
+            } else if (event.status.toLowerCase().includes('checking')) {
+                alertClass = 'alert-info';
+                statusText = '🔄 Checking...';
+            } else {
+                alertClass = 'alert-warning';
+                statusText = '⏳ Not Available';
+            }
+            
+            const isUrgent = alertClass === 'alert-success' || alertClass === 'alert-danger';
             
             return `
                 <div class="col-md-6 mb-4">
@@ -203,86 +311,23 @@
                             <div class="d-flex justify-content-between align-items-start">
                                 <h5 class="card-title">${event.name}</h5>
                                 <span class="badge ${alertClass} status-badge">
-                                    ${event.status}
+                                    ${statusText}
                                 </span>
                             </div>
                             <p class="concert-date mb-2">${event.date}</p>
                             <div class="d-flex justify-content-between align-items-center">
                                 <small class="last-checked">Last checked: ${event.lastChecked}</small>
-                                <a href="${event.url}" target="_blank" class="btn btn-sm btn-outline-primary">Check Tickets</a>
+                                <a href="${event.url}" target="_blank" class="btn btn-sm ${isUrgent ? 'btn-danger' : 'btn-outline-primary'}">
+                                    ${isUrgent ? '🎫 Check Tickets Now!' : 'View on Ticketera'}
+                                </a>
                             </div>
                         </div>
                     </div>
                 </div>`;
         }
 
-        function updateNextCheckTime() {
-            const now = new Date();
-            const nextCheck = new Date(now.getTime() + CHECK_INTERVAL);
-            document.getElementById('nextCheck').textContent = 
-                `Next check at: ${nextCheck.toLocaleTimeString()}`;
-        }
-
-        function updateDisplay() {
-            updateCountdown();
-            updateNextCheckTime();
-            
-            fetch('/api/tickets')
-                .then(response => response.json())
-                .then(data => {
-                    // Clear containers
-                    document.getElementById('mainEventContainer').innerHTML = '';
-                    document.getElementById('julyEvents').innerHTML = '';
-                    document.getElementById('augustEvents').innerHTML = '';
-                    document.getElementById('septemberEvents').innerHTML = '';
-
-                    // Sort events by date
-                    const sortedEvents = Object.entries(data).sort((a, b) => {
-                        if (a[1].date === 'N/A') return -1;
-                        if (b[1].date === 'N/A') return 1;
-                        
-                        const dateA = new Date(a[1].date + ', 2025');
-                        const dateB = new Date(b[1].date + ', 2025');
-                        return dateA - dateB;
-                    });
-
-                    let statusChanged = false;
-                    for (const [id, event] of sortedEvents) {
-                        const card = createEventCard(id, event, id === 'main_page');
-                        
-                        // Check for status changes
-                        if (previousStates[id] && previousStates[id] !== event.status) {
-                            statusChanged = true;
-                        }
-                        previousStates[id] = event.status;
-                        
-                        if (id === 'main_page') {
-                            document.getElementById('mainEventContainer').innerHTML = card;
-                        } else if (event.date.includes('July')) {
-                            document.getElementById('julyEvents').innerHTML += card;
-                        } else if (event.date.includes('August')) {
-                            document.getElementById('augustEvents').innerHTML += card;
-                        } else if (event.date.includes('September')) {
-                            document.getElementById('septemberEvents').innerHTML += card;
-                        }
-
-                        // Highlight cards with status changes
-                        if (statusChanged) {
-                            setTimeout(() => {
-                                const cardElement = document.getElementById(`card-${id}`);
-                                if (cardElement) {
-                                    cardElement.classList.add('status-change');
-                                    setTimeout(() => cardElement.classList.remove('status-change'), 1000);
-                                }
-                            }, 100);
-                            
-                            if (event.alert_level === 'success') {
-                                playAlertSound();
-                            }
-                        }
-                    }
-                });
-        }
+        // Initialize sound button state
+        updateSoundButton();
 
         // Update display every 15 seconds
         updateDisplay();
