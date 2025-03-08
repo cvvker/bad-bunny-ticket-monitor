@@ -266,9 +266,10 @@
         </button>
     </div>
 
-    <audio id="alertSound" style="display: none;">
+    <audio id="alertSound" preload="auto" style="display: none;">
         <!-- Default alert sound - base64 encoded MP3 -->
         <source src="data:audio/mpeg;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAASAAAeMwAUFBQUFCgoKCgoKDw8PDw8PFBQUFBQUG5ubm5uboKCgoKCgpaWlpaWlqqqqqqqqr6+vr6+vtLS0tLS0ubm5ubm5vr6+vr6+v8AAAAATGF2YzU4LjEzAAAAAAAAAAAAAAAAJAQKAAAAAAAAHjOZTf9C//MsAAAAAAAAAAAAAAAAAAAA//tQZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAACzAAICAg4ODg4SEhISEhoaGhoaHh4eHh4iIiIiIiYmJiYmKioqKiouLi4uLjMzMzMzNzc3Nzc8PDw8PD4+Pj4+P8AAAAATGF2ZTU4LjEzAAAAAAAAAAAAAAAAJAQGAAAAAAAACs3yxUAAAAAAAAAAAAAAAAAAAAAA//sQZAAP8AAAaQAAAAgAAA0gAAABAAABpAAAACAAADSAAAAETEFNRTMuOTkuNVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/+xBkBY/wAABpAAAACAAADSAAAAEAAAGkAAAAIAAANIAAAARVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV" type="audio/mpeg">
+        Your browser does not support the audio element.
     </audio>
 
     <script>
@@ -368,6 +369,12 @@
             if (soundEnabled) {
                 const audioElement = document.getElementById('alertSound');
                 
+                // Make sure the audio element is properly loaded
+                if (audioElement.readyState === 0) {  // HAVE_NOTHING
+                    // Force a load if needed
+                    audioElement.load();
+                }
+                
                 // Reset the audio to the beginning
                 audioElement.currentTime = 0;
                 
@@ -380,8 +387,14 @@
                         console.log("Alert sound played successfully");
                     })
                     .catch(error => {
-                        // Auto-play was prevented, show a UI element to let the user start playback
+                        // Auto-play was prevented, log error
                         console.error("Audio playback was prevented:", error);
+                        
+                        // Try again once after a brief delay (user may have interacted by then)
+                        setTimeout(() => {
+                            audioElement.currentTime = 0;
+                            audioElement.play().catch(e => console.error("Retry also failed:", e));
+                        }, 1000);
                     });
                 }
             }
@@ -704,7 +717,31 @@
         
         function testSound() {
             const audio = document.getElementById('alertSound');
-            audio.play();
+            
+            // Make sure the audio element is properly loaded
+            if (audio.readyState === 0) {  // HAVE_NOTHING
+                // Force a load if needed
+                audio.load();
+            }
+            
+            // Reset to beginning and attempt to play
+            audio.currentTime = 0;
+            
+            // Create a user interaction context for autoplay
+            const playPromise = audio.play();
+            
+            if (playPromise !== undefined) {
+                playPromise.then(() => {
+                    console.log("Test sound played successfully");
+                }).catch(error => {
+                    console.error("Error playing test sound:", error);
+                    if (error.name === "NotAllowedError") {
+                        alert("Browser blocked autoplay. Please interact with the page first (click somewhere) and try again.");
+                    } else {
+                        alert("Error playing sound: " + error.message);
+                    }
+                });
+            }
         }
     </script>
 </body>
