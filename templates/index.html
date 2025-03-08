@@ -171,7 +171,7 @@
                 </svg>
                 <div class="countdown-number">15</div>
             </div>
-            <div>Next Check In</div>
+            <div id="checkingLabel">Next Check In</div>
             <div class="next-check-time" id="nextCheckTime"></div>
         </div>
 
@@ -200,6 +200,9 @@
     </audio>
 
     <script>
+        const SERVER_CHECK_INTERVAL = 60000; // 60 seconds in milliseconds
+        const UI_UPDATE_INTERVAL = 15000;    // Still update UI frequently (15 seconds)
+        
         function toggleSound() {
             const soundEnabled = localStorage.getItem('soundEnabled') === 'true';
             localStorage.setItem('soundEnabled', (!soundEnabled).toString());
@@ -249,12 +252,10 @@
                     }).catch(error => {
                         console.error("Error playing audio:", error);
                         
-                        // If user interaction required, show alert
                         if (error.name === "NotAllowedError") {
                             alert("Please interact with the page to enable sound notifications");
                         }
                         
-                        // Retry if not reached max attempts
                         if (attempts < maxAttempts) {
                             setTimeout(attemptPlay, 1000);
                         }
@@ -276,14 +277,27 @@
         }
 
         let previousStates = {};
-        const CHECK_INTERVAL = 15000; // 15 seconds
         let lastCheckTime = new Date();
+        let cachedData = null;  // Store the last successful data
 
         function updateCountdown() {
             const currentTime = new Date();
-            const elapsedMs = currentTime - lastCheckTime;
-            const remainingMs = Math.max(0, CHECK_INTERVAL - elapsedMs);
-            const remainingSeconds = Math.ceil(remainingMs / 1000);
+            let targetInterval;
+            
+            // Use the UI update interval for countdown display, but sync with server checks
+            const timeUntilServerCheck = SERVER_CHECK_INTERVAL - ((currentTime - lastCheckTime) % SERVER_CHECK_INTERVAL);
+            const timeUntilUIUpdate = UI_UPDATE_INTERVAL - ((currentTime - lastCheckTime) % UI_UPDATE_INTERVAL);
+            
+            // When close to a server check, show that countdown, otherwise show UI update countdown
+            if (timeUntilServerCheck <= UI_UPDATE_INTERVAL) {
+                targetInterval = timeUntilServerCheck;
+                document.getElementById('checkingLabel').textContent = "Server Check In:";
+            } else {
+                targetInterval = timeUntilUIUpdate;
+                document.getElementById('checkingLabel').textContent = "UI Update In:";
+            }
+            
+            const remainingSeconds = Math.ceil(targetInterval / 1000);
             
             // Update the countdown display
             const countdownNumber = document.querySelector('.countdown-number');
@@ -294,14 +308,14 @@
             // Update the progress circle
             const progressCircle = document.querySelector('.countdown-circle .progress');
             if (progressCircle) {
-                const dashoffset = 283 * (remainingMs / CHECK_INTERVAL);
+                const dashoffset = 283 * (targetInterval / (targetInterval === timeUntilServerCheck ? SERVER_CHECK_INTERVAL : UI_UPDATE_INTERVAL));
                 progressCircle.style.strokeDashoffset = dashoffset;
             }
             
             // Update the next check time
             const nextCheckTime = document.getElementById('nextCheckTime');
             if (nextCheckTime) {
-                const nextCheck = new Date(lastCheckTime.getTime() + CHECK_INTERVAL);
+                const nextCheck = new Date(currentTime.getTime() + targetInterval);
                 nextCheckTime.textContent = nextCheck.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
             }
             
@@ -316,17 +330,19 @@
             // Determine the appropriate status class
             let statusClass = 'alert-info';
             let statusText = event.status || "⚡ Not Yet Available";
+            let urgentClass = '';
             
-            if (statusText.includes('AVAILABLE')) {
+            if (statusText.includes('AVAILABLE') || statusText.includes('CHECK NOW')) {
                 statusClass = 'alert-success';
-            } else if (statusText.includes('CHECK NOW')) {
+                urgentClass = 'urgent-alert';
+            } else if (statusText.includes('Queue') || statusText.includes('Waitlist')) {
                 statusClass = 'alert-warning';
-            } else if (statusText.includes('Not Available')) {
+            } else if (statusText.includes('Not Available') || statusText.includes('Sold Out') || statusText.includes('Blocked')) {
                 statusClass = 'alert-danger';
             }
             
             col.innerHTML = `
-                <div class="card ticket-card" data-event-id="${id}">
+                <div class="card ticket-card ${urgentClass}" data-event-id="${id}">
                     <div class="status-alert ${statusClass}"></div>
                     <div class="card-body">
                         <h5 class="card-title">${event.name}</h5>
@@ -342,7 +358,7 @@
             return col;
         }
 
-        // Hardcoded Bad Bunny concert dates
+        // Hardcoded Bad Bunny concert dates - ensure these match the server-side configuration
         const CONCERT_DATES = {
             'July': ['12', '18', '19'],
             'August': ['1', '2', '3', '8', '9', '10', '15', '16', '17', '22', '23', '24', '29', '30', '31'],
@@ -370,29 +386,43 @@
             return fallbackData;
         }
 
-        function updateDisplay() {
-            // Try to fetch from the API first
+        function updateDisplay(forceFetch = false) {
+            // When not forcing a fetch, use the cached data and just update the UI
+            if (!forceFetch && cachedData) {
+                processTicketData(cachedData);
+                return;
+            }
+            
+            // Only fetch from the server periodically to avoid triggering anti-bot measures
             fetch('/api/tickets')
                 .then(response => response.json())
                 .then(data => {
+                    // Cache successful responses
+                    if (data && Object.keys(data).length > 0 && !data.error) {
+                        cachedData = data;
+                        lastCheckTime = new Date();
+                    }
+                    
                     // Handle the API response or use fallback data
                     processTicketData(data);
                 })
                 .catch(error => {
-                    // On API error, use fallback data
+                    // On API error, use cached or fallback data
                     console.error('Error fetching tickets:', error);
-                    const fallbackData = generateFallbackData();
-                    processTicketData(fallbackData);
+                    const dataToUse = cachedData || generateFallbackData();
+                    processTicketData(dataToUse);
                 });
         }
 
         function processTicketData(data) {
             const container = document.getElementById('tickets-container');
+            if (!container) return;
+            
             container.innerHTML = '';
 
-            // If data is empty or has errors, use fallback data
+            // If data is empty or has errors, use cached or fallback data
             if (!data || Object.keys(data).length === 0 || data.error) {
-                data = generateFallbackData();
+                data = cachedData || generateFallbackData();
             }
 
             // Group events by month
@@ -402,6 +432,7 @@
                 'September': []
             };
 
+            // Process and categorize the data
             Object.entries(data).forEach(([id, event]) => {
                 const month = event.date ? event.date.split(',')[0].trim() : null;
                 if (month && months[month]) {
@@ -444,14 +475,22 @@
                 const currentStatus = event.status;
 
                 if (prevStatus && prevStatus !== currentStatus) {
-                    if (currentStatus && currentStatus.includes('AVAILABLE')) {
+                    // Double notification for high-priority alerts
+                    if (currentStatus && (currentStatus.includes('AVAILABLE') || currentStatus.includes('CHECK NOW'))) {
+                        // First notification
                         playAlertSound();
+                        
+                        // Card animation
                         const card = document.querySelector(`[data-event-id="${id}"]`);
                         if (card) {
                             card.classList.add('urgent-alert');
                             setTimeout(() => card.classList.remove('urgent-alert'), 5000);
                         }
-                    } else if (currentStatus && currentStatus.includes('CHECK NOW')) {
+                        
+                        // Second notification after a delay
+                        setTimeout(playAlertSound, 3000);
+                    } else if (currentStatus && (currentStatus.includes('Queue') || currentStatus.includes('Waitlist'))) {
+                        // Single notification for less urgent status
                         playAlertSound();
                     }
                 }
@@ -479,20 +518,27 @@
                     container.appendChild(row);
                 }
             });
-
-            // Update last check time
-            lastCheckTime = new Date();
-            updateCountdown();
         }
 
         // Initialize
-        localStorage.setItem('soundEnabled', 'true');
-        updateSoundButton();
-        updateDisplay();
-        updateCountdown();
+        function initialize() {
+            localStorage.setItem('soundEnabled', 'true');
+            updateSoundButton();
+            
+            // Initial data fetch
+            updateDisplay(true);
+            updateCountdown();
+            
+            // Set intervals for regular updates
+            // Frequent UI updates from cached data (15 seconds)
+            setInterval(() => updateDisplay(false), UI_UPDATE_INTERVAL);
+            
+            // Occasional server data fetches (60 seconds)
+            setInterval(() => updateDisplay(true), SERVER_CHECK_INTERVAL);
+        }
         
-        // Set interval for regular updates
-        setInterval(updateDisplay, CHECK_INTERVAL);
+        // Initialize when DOM is ready
+        document.addEventListener('DOMContentLoaded', initialize);
     </script>
 </body>
 </html>

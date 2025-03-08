@@ -19,6 +19,30 @@ logger = logging.getLogger(__name__)
 CHECK_INTERVAL = int(os.getenv('CHECK_INTERVAL', '15'))  # 15 seconds default
 DISCORD_WEBHOOK_URL = os.getenv('DISCORD_WEBHOOK_URL', 'https://discord.com/api/webhooks/1347702022039666783/IIgJ2B6vT5aQoTjNOadVxdAviHuEsCRR8zwu4CgWAvWzcob9BJ0_5XQC-BTyVauTljR_')
 
+# Import Playwright for headless browser
+try:
+    from playwright.sync_api import sync_playwright
+    PLAYWRIGHT_AVAILABLE = True
+except ImportError:
+    PLAYWRIGHT_AVAILABLE = False
+    print("Playwright not available. Falling back to requests-only mode.")
+
+# Bad Bunny tour dates (as per user specifications)
+BAD_BUNNY_DATES = {
+    'July': ['12', '18', '19'],
+    'August': ['1', '2', '3', '8', '9', '10', '15', '16', '17', '22', '23', '24', '29', '30', '31'],
+    'September': ['5', '6', '7', '12', '13', '14']
+}
+
+# Generate all event IDs for the Bad Bunny tour
+BAD_BUNNY_EVENT_IDS = []
+for month, days in BAD_BUNNY_DATES.items():
+    for day in days:
+        BAD_BUNNY_EVENT_IDS.append(f"{month.lower()}-{day}")
+
+# Base Ticketera URL
+TICKETERA_BASE_URL = "https://choli.ticketera.com/"
+
 # Base URLs for different venues
 TICKETERA_URLS = {
     'July': {
@@ -64,7 +88,10 @@ app = Flask(__name__)
 logger = app.logger
 
 # Monitoring settings
-CHECK_INTERVAL = int(os.environ.get('CHECK_INTERVAL', 15))  # seconds
+BASE_CHECK_INTERVAL = 60  # Base interval in seconds
+JITTER_MAX = 30  # Maximum random delay to add to each check (in seconds)
+MAX_DATES_PER_CHECK = 3  # Only check a few dates each interval
+CHECK_INTERVAL = int(os.environ.get('CHECK_INTERVAL', BASE_CHECK_INTERVAL))  # Increased to 60 seconds to avoid triggering anti-bot measures
 DISCORD_WEBHOOK_URL = os.environ.get('DISCORD_WEBHOOK_URL', 'https://discord.com/api/webhooks/1347702022039666783/IIgJ2B6vT5aQoTjNOadVxdAviHuEsCRR8zwu4CgWAvWzcob9BJ0_5XQC-BTyVauTljR_')
 
 # Global state
@@ -88,264 +115,337 @@ def generate_event_url(month, day):
         return None
     return url
 
-def send_discord_notification(message, title, description, url=None, is_urgent=False):
+def send_discord_notification(message, use_mentions=False):
+    """Send a notification to Discord via webhook"""
+    if not DISCORD_WEBHOOK_URL:
+        logger.warning("Discord webhook URL not set, skipping notification")
+        return
+    
     try:
-        embed = {
-            "title": title,
-            "description": (
-                f"{description}\n\n"
-                f"🎯 Direct Link: [Click here to check tickets]({url})\n\n"
-                f"⚡ Act Fast: Tickets may sell out quickly!\n"
-                f"🕒 Found at: {datetime.now().strftime('%I:%M:%S %p')}"
-            ),
-            "color": 16711680 if is_urgent else 5814783,
-            "timestamp": datetime.utcnow().isoformat()
+        # Add appropriate mentions if needed
+        if use_mentions:
+            message = f"@everyone {message}"
+            
+        payload = {
+            "content": message,
+            "username": "Bad Bunny Ticket Monitor",
+            "avatar_url": "https://i.imgur.com/MJd3Vpx.jpg"
         }
         
-        if url:
-            embed["url"] = url
-
-        payload = {
-            "content": "@everyone " + message if is_urgent else message,
-            "embeds": [embed]
-        }
-
         response = requests.post(DISCORD_WEBHOOK_URL, json=payload)
         response.raise_for_status()
         
-        if is_urgent:
-            # Send a second notification for critical updates
-            time.sleep(1)
-            payload["content"] = "🚨 URGENT REMINDER: " + message
-            requests.post(DISCORD_WEBHOOK_URL, json=payload)
+        # For high-priority alerts, send a second notification after a delay
+        if "TICKETS AVAILABLE" in message or "CHECK NOW" in message:
+            time.sleep(1)  # Short delay between notifications
             
-        logger.info(f"Discord notification sent: {title}")
-        
+            # Second notification with step-by-step instructions
+            instructions = """
+**URGENT: Tickets may be available!** 🔥
+
+**Follow these steps immediately:**
+1. Click the ticket link above
+2. Select your ticket quantity
+3. Complete checkout as quickly as possible
+4. Tickets sell out fast - don't hesitate!
+
+Good luck! 🍀
+            """
+            
+            follow_up = {
+                "content": instructions,
+                "username": "Bad Bunny Ticket Monitor",
+                "avatar_url": "https://i.imgur.com/MJd3Vpx.jpg"
+            }
+            
+            response = requests.post(DISCORD_WEBHOOK_URL, json=follow_up)
+            response.raise_for_status()
+            
+        logger.info("Discord notification sent successfully")
     except Exception as e:
         logger.error(f"Error sending Discord notification: {e}")
 
 def check_ticketera_availability(event_url):
-    try:
-        # Create a session with retry capability
-        session = requests.Session()
-        
-        # Configure retry strategy
-        retry_strategy = Retry(
-            total=3,
-            backoff_factor=0.5,
-            status_forcelist=[429, 500, 502, 503, 504],
-            allowed_methods=["GET"]
-        )
-        
-        adapter = HTTPAdapter(max_retries=retry_strategy)
-        session.mount("http://", adapter)
-        session.mount("https://", adapter)
-        
-        # Rotate user agents
-        user_agents = [
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.2210.91',
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/115.0',
-            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15',
-            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36 OPR/107.0.0.0'
-        ]
-        
-        # Browser-like headers
-        headers = {
-            'User-Agent': random.choice(user_agents),
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.9,es;q=0.8',
-            'Accept-Encoding': 'gzip, deflate, br',
-            'Cache-Control': 'no-cache',
-            'Pragma': 'no-cache',
-            'Sec-Ch-Ua': '"Not A(Brand";v="99", "Google Chrome";v="121", "Chromium";v="121"',
-            'Sec-Ch-Ua-Mobile': '?0',
-            'Sec-Ch-Ua-Platform': '"Windows"',
-            'Sec-Fetch-Dest': 'document',
-            'Sec-Fetch-Mode': 'navigate',
-            'Sec-Fetch-Site': 'none',
-            'Sec-Fetch-User': '?1',
-            'Upgrade-Insecure-Requests': '1',
-            'Referer': 'https://choli.ticketera.com/'
-        }
-        
-        # Add cookies to simulate a real browser
-        cookies = {
-            'visited': 'true',
-            'session_id': f'{random.randint(1000000, 9999999)}',
-            'locale': 'es-PR',
-            'timezone': 'America/Puerto_Rico'
-        }
-        
-        # Simulate some delay like a real user would have
-        time.sleep(random.uniform(0.5, 2.0))
-        
-        # First, make a request to the homepage to get cookies
-        try:
-            home_response = session.get('https://choli.ticketera.com/', headers=headers, timeout=10)
-            # Extract any cookies from the response
-            for cookie in home_response.cookies:
-                session.cookies.set(cookie.name, cookie.value)
-        except Exception as e:
-            logger.warning(f"Could not get homepage cookies: {e}")
-        
-        # Make the request to the event URL
-        response = session.get(event_url, headers=headers, cookies=cookies, timeout=15)
-        response.raise_for_status()
-        
-        soup = BeautifulSoup(response.text, 'html.parser')
-        
-        # Look for ticket availability indicators
-        sold_out_indicators = [
-            'sold out', 'agotado', 'no tickets available', 'no hay boletos',
-            'evento finalizado', 'event ended'
-        ]
-        
-        # Get visible text content
-        page_text = ' '.join([
-            text for text in soup.stripped_strings
-            if not any(tag in str(text.parent) for tag in ['script', 'style', 'meta'])
-        ]).lower()
-        
-        # Look for ticket-related elements
-        ticket_elements = soup.find_all(['div', 'span', 'button'], string=lambda s: s and any(word in s.lower() for word in ['ticket', 'boleto', 'price', 'precio']))
-        
-        if any(indicator in page_text for indicator in sold_out_indicators):
-            return "❌ Not Available"
-        elif ticket_elements:
-            # Check if any of the ticket elements indicate availability
-            ticket_text = ' '.join(elem.get_text().lower() for elem in ticket_elements)
-            if any(word in ticket_text for word in ['available', 'buy', 'comprar', 'add to cart', 'añadir']):
-                return "✅ TICKETS AVAILABLE!"
-            else:
-                return "⚠️ CHECK NOW - Possible Tickets"
-        else:
-            return "⚡ Not Yet Available"
-            
-    except requests.RequestException as e:
-        logger.error(f"Error checking Ticketera: {e}")
-        return "⚡ Error checking availability"
-    except Exception as e:
-        logger.error(f"Unexpected error checking tickets: {e}")
-        return "⚡ Error checking availability"
-
-def update_ticket_status():
-    global ticket_status, last_check, last_update_time
+    # Create a session with retry capability
+    session = requests.Session()
+    retry_strategy = Retry(
+        total=5,  # Maximum number of retries
+        backoff_factor=1,  # Time factor between retries
+        status_forcelist=[429, 500, 502, 503, 504],  # Retry on these status codes
+        allowed_methods=["GET"]
+    )
+    adapter = HTTPAdapter(max_retries=retry_strategy)
+    session.mount("http://", adapter)
+    session.mount("https://", adapter)
+    
+    # Get a random user agent from a large pool of real browser user agents
+    user_agents = [
+        # Chrome Windows
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36",
+        # Firefox Windows
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:120.0) Gecko/20100101 Firefox/120.0",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:119.0) Gecko/20100101 Firefox/119.0",
+        # Safari macOS
+        "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_1) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.1 Safari/605.1.15",
+        # Edge Windows
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0",
+        # Mobile browsers
+        "Mozilla/5.0 (iPhone; CPU iPhone OS 17_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1",
+        "Mozilla/5.0 (Linux; Android 14; SM-S918B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.6099.43 Mobile Safari/537.36",
+    ]
+    user_agent = random.choice(user_agents)
+    
+    # Create headers that mimic a real browser
+    headers = {
+        "User-Agent": user_agent,
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
+        "Accept-Language": "en-US,en;q=0.9,es;q=0.8",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Connection": "keep-alive",
+        "Upgrade-Insecure-Requests": "1",
+        "Sec-Fetch-Dest": "document",
+        "Sec-Fetch-Mode": "navigate",
+        "Sec-Fetch-Site": "none",
+        "Sec-Fetch-User": "?1",
+        "Cache-Control": "max-age=0",
+        "Referer": "https://www.google.com/",
+        "DNT": "1",
+    }
+    
+    # Add cookies to simulate a real browser session
+    cookies = {
+        "_ga": f"GA1.2.{random.randint(1000000000, 9999999999)}.{int(time.time() - random.randint(3600, 86400))}",
+        "_gid": f"GA1.2.{random.randint(1000000000, 9999999999)}.{int(time.time())}",
+        "_fbp": f"fb.1.{int(time.time()) - random.randint(3600, 86400)}.{random.randint(1000000000, 9999999999)}",
+    }
+    
+    # Add random delay to mimic human behavior (between 1 and 5 seconds)
+    time.sleep(random.uniform(1, 5))
     
     try:
-        current_status = {}
-        current_time = datetime.now()
+        # Get the page content
+        response = session.get(event_url, headers=headers, cookies=cookies, timeout=30)
+        response.raise_for_status()
         
-        # If we have previous status data, use it as a starting point
-        if ticket_status:
-            current_status = ticket_status.copy()
+        # Parse the html content
+        soup = BeautifulSoup(response.text, 'lxml')
         
-        # Get all dates to check
-        all_dates = []
-        for month, days in CONCERT_DATES.items():
-            for day in days:
-                event_id = f"{month.lower()}-{day}"
-                all_dates.append((month, day, event_id))
-        
-        # Shuffle dates to randomize check order
-        random.shuffle(all_dates)
-        
-        # Only check a subset of dates each time to avoid too many requests at once
-        # This helps avoid triggering rate limits and makes the requests look more natural
-        max_checks = min(5, len(all_dates))
-        dates_to_check = []
-        
-        # Prioritize dates that haven't been checked recently
-        for month, day, event_id in all_dates:
-            last_update = last_update_time.get(event_id, datetime.min)
-            time_since_update = (current_time - last_update).total_seconds()
+        # Look for indicators of ticket availability
+        if "¡Entradas disponibles!" in response.text or "Comprar ahora" in response.text:
+            return "🔥 TICKETS AVAILABLE! CHECK NOW 🔥"
+        elif "coming soon" in response.text.lower() or "próximamente" in response.text.lower():
+            return "⚡ Coming Soon"
+        elif "sold out" in response.text.lower() or "agotado" in response.text.lower():
+            return "❌ Sold Out"
+        else:
+            # Check for specific elements that might indicate availability
+            buy_buttons = soup.select('button.buy-button, .checkout-button, .buy-now')
+            if buy_buttons:
+                return "⚠️ Possible Availability - CHECK NOW"
             
-            # If it's been over 5 minutes since this date was last checked, consider checking it
-            if time_since_update > 300:
-                dates_to_check.append((month, day, event_id))
-                if len(dates_to_check) >= max_checks:
-                    break
-        
-        # If we don't have enough dates due for checking, add some random ones
-        if len(dates_to_check) < max_checks:
-            remaining_dates = [date for date in all_dates if date not in dates_to_check]
-            random.shuffle(remaining_dates)
-            dates_to_check.extend(remaining_dates[:max_checks - len(dates_to_check)])
-        
-        # Check each selected date
-        for month, day, event_id in dates_to_check:
-            event_url = generate_event_url(month, day)
-            if not event_url:
-                logger.error(f"No URL found for {month} {day}")
-                continue
+            # Check for waitlist or queue indicators
+            waitlist = soup.select('.waitlist, .queue, .waiting-room')
+            if waitlist:
+                return "⏳ In Queue/Waitlist"
+            
+            # Fallback message
+            return "⚡ Not Yet Available"
+            
+    except requests.exceptions.HTTPError as e:
+        if e.response.status_code == 403:
+            logger.error(f"Blocked by Ticketera: 403 Forbidden: {e}")
+            return "🚫 Access Blocked - Using Cached Status"
+        else:
+            logger.error(f"HTTP Error: {e}")
+            return "⚠️ Error Checking - Using Cached Status"
+    except requests.exceptions.RequestException as e:
+        logger.error(f"Error checking Ticketera: {e}")
+        return "⚡ Error checking availability"
+
+def check_with_playwright(event_url):
+    """
+    Check ticket availability using Playwright for more sophisticated browser simulation.
+    This is used when available as a fallback for anti-bot measures.
+    """
+    if not PLAYWRIGHT_AVAILABLE:
+        return "⚠️ Cannot check (browser automation not available)"
+    
+    try:
+        with sync_playwright() as p:
+            # Launch a new browser with stealth mode settings
+            browser = p.chromium.launch(headless=True)
+            context = browser.new_context(
+                viewport={"width": 1920, "height": 1080},
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                locale="en-US"
+            )
+            
+            # Enable JavaScript and cookies
+            context.add_init_script("""
+                Object.defineProperty(navigator, 'webdriver', {
+                    get: () => false,
+                });
+            """)
+            
+            # Create a new page and navigate to the event URL
+            page = context.new_page()
+            
+            # Set various headers to appear more like a real browser
+            page.set_extra_http_headers({
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+                "Accept-Language": "en-US,en;q=0.9,es;q=0.8",
+                "Accept-Encoding": "gzip, deflate, br",
+                "Connection": "keep-alive",
+                "Upgrade-Insecure-Requests": "1",
+                "Sec-Fetch-Dest": "document",
+                "Sec-Fetch-Mode": "navigate",
+                "Sec-Fetch-Site": "none",
+                "Sec-Fetch-User": "?1",
+                "DNT": "1",
+            })
+            
+            # Navigate to the event with a timeout
+            page.goto(event_url, wait_until="domcontentloaded", timeout=60000)
+            
+            # Wait for potential lazy-loaded content
+            page.wait_for_timeout(random.randint(2000, 5000))
+            
+            # Get the content
+            content = page.content()
+            
+            # Check for ticket availability indicators in the content
+            if "¡Entradas disponibles!" in content or "Comprar ahora" in content:
+                browser.close()
+                return "🔥 TICKETS AVAILABLE! CHECK NOW 🔥"
+            elif "coming soon" in content.lower() or "próximamente" in content.lower():
+                browser.close()
+                return "⚡ Coming Soon"
+            elif "sold out" in content.lower() or "agotado" in content.lower():
+                browser.close()
+                return "❌ Sold Out"
+            else:
+                # Check for specific elements that might indicate availability
+                buy_button = page.query_selector('button:has-text("Comprar"), button:has-text("Buy"), a:has-text("Comprar"), a:has-text("Buy")')
+                if buy_button:
+                    browser.close()
+                    return "⚠️ Possible Availability - CHECK NOW"
                 
-            try:
-                status = check_ticketera_availability(event_url)
-                last_update_time[event_id] = current_time
-            except Exception as e:
-                logger.error(f"Error checking {month} {day}: {e}")
-                # Use previously known status or fallback
-                if event_id in ticket_status:
-                    status = ticket_status[event_id].get('status', "⚡ Not Yet Available")
-                else:
-                    status = "⚡ Not Yet Available"
-            
-            date = format_date(month, day)
-            previous_status = ticket_status.get(event_id, {}).get('status')
-            
-            current_status[event_id] = {
-                'name': f"Bad Bunny - {date}",
-                'date': date,
-                'status': status,
-                'url': event_url,
-                'lastChecked': current_time.strftime('%I:%M:%S %p')
-            }
-            
-            # Send notification if status changed
-            if previous_status and previous_status != status:
-                is_urgent = "AVAILABLE" in status or "CHECK NOW" in status
-                send_discord_notification(
-                    f"Status changed for {date}!",
-                    f"Bad Bunny - {date}",
-                    f"Previous status: {previous_status}\nNew status: {status}",
-                    event_url,
-                    is_urgent
-                )
-        
-        # Add any missing dates to ensure all dates appear in the UI
-        for month, days in CONCERT_DATES.items():
-            for day in days:
-                event_id = f"{month.lower()}-{day}"
-                if event_id not in current_status:
-                    date = format_date(month, day)
-                    event_url = generate_event_url(month, day)
-                    if not event_url:
-                        continue
-                        
-                    # Use previously known status or fallback
-                    if event_id in ticket_status:
-                        status = ticket_status[event_id].get('status', "⚡ Not Yet Available")
-                    else:
-                        status = "⚡ Not Yet Available"
-                        
-                    current_status[event_id] = {
-                        'name': f"Bad Bunny - {date}",
-                        'date': date,
-                        'status': status,
-                        'url': event_url,
-                        'lastChecked': "Pending..."
-                    }
-        
-        # Update the global ticket status
-        ticket_status = current_status
-        last_check = current_time
-        
-        logger.info("Ticket status updated successfully")
-        return ticket_status
-        
+                # Check for waitlist or queue indicators
+                waitlist = page.query_selector('text="waitlist", text="queue", text="waiting room", text="cola", text="espera"')
+                if waitlist:
+                    browser.close()
+                    return "⏳ In Queue/Waitlist"
+                
+                # Fallback message
+                browser.close()
+                return "⚡ Not Yet Available"
+    
     except Exception as e:
-        logger.error(f"Error updating ticket status: {e}")
-        return ticket_status
+        logger.error(f"Playwright error checking Ticketera: {e}")
+        return "⚠️ Error Checking (Browser) - Using Cached Status"
+
+def update_ticket_status():
+    """Enhanced update function with fallback mechanisms and smart date selection"""
+    global ticket_status, last_check, last_update_time
+    
+    last_check = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    
+    # Generate all Bad Bunny event dates if not in ticket_status
+    for event_id in BAD_BUNNY_EVENT_IDS:
+        if event_id not in ticket_status:
+            # Extract month and day from the event ID
+            month, day = event_id.split('-')
+            month = month.capitalize()
+            
+            # Set up initial status for this event
+            date_str = f"{month} {day}, 2025"
+            
+            # Get URL for this event if available, otherwise use the base URL
+            event_url = TICKETERA_BASE_URL
+            if month in TICKETERA_URLS and day in TICKETERA_URLS[month]:
+                event_url = TICKETERA_URLS[month][day]
+            
+            ticket_status[event_id] = {
+                "name": f"Bad Bunny - {date_str}",
+                "date": date_str,
+                "status": "⚡ Not Yet Available",
+                "url": event_url,
+                "lastChecked": "Pending..."
+            }
+    
+    # Sort dates by last check time (oldest first)
+    sorted_dates = sorted(
+        ticket_status.keys(),
+        key=lambda x: last_update_time.get(x, 0)
+    )
+    
+    # Only check a subset of dates each time, prioritizing those checked least recently
+    # This helps avoid triggering anti-bot detection
+    max_checks = min(MAX_DATES_PER_CHECK, len(sorted_dates))
+    dates_to_check = sorted_dates[:max_checks]
+    
+    for event_id in dates_to_check:
+        # Only update if we have the event in our tracking
+        if event_id in ticket_status:
+            # Extract month and day
+            month, day = event_id.split('-')
+            month = month.capitalize()
+            
+            # Get URL for this event
+            event_url = TICKETERA_BASE_URL
+            if month in TICKETERA_URLS and day in TICKETERA_URLS[month]:
+                event_url = TICKETERA_URLS[month][day]
+            
+            # 10% chance to use Playwright for enhanced anti-bot capabilities
+            if PLAYWRIGHT_AVAILABLE and random.random() < 0.10:
+                logger.info(f"Using Playwright to check {event_id} ({event_url})")
+                status = check_with_playwright(event_url)
+            else:
+                # Otherwise use regular requests (which is faster but more detectable)
+                logger.info(f"Using Requests to check {event_id} ({event_url})")
+                status = check_ticketera_availability(event_url)
+            
+            # Add jitter to request timing to seem more human-like
+            time.sleep(random.uniform(1, JITTER_MAX))
+            
+            # Update status and last check time
+            previous_status = ticket_status[event_id]["status"]
+            
+            # Only send Discord notification if the status changed significantly
+            if previous_status != status:
+                logger.info(f"Status change for {event_id}: {previous_status} -> {status}")
+                
+                # Only notify for certain status changes (to avoid notification spam)
+                should_notify = (
+                    ("TICKETS AVAILABLE" in status) or
+                    ("CHECK NOW" in status) or
+                    (previous_status != "⚡ Not Yet Available" and "Not Yet Available" not in status)
+                )
+                
+                if should_notify:
+                    # Send Discord notification
+                    event_name = ticket_status[event_id]["name"]
+                    notification_text = f"**Status Change** for {event_name}\n{previous_status} → {status}\n[Check Tickets]({event_url})"
+                    
+                    # Add @everyone mention for high priority alerts
+                    if "TICKETS AVAILABLE" in status or "CHECK NOW" in status:
+                        send_discord_notification(notification_text, use_mentions=True)
+                    else:
+                        send_discord_notification(notification_text)
+            
+            # Update ticket status in our tracking
+            ticket_status[event_id].update({
+                "status": status,
+                "lastChecked": datetime.now().strftime("%H:%M:%S")
+            })
+            
+            # Update the last check time for this event
+            last_update_time[event_id] = time.time()
+            
+    # Return the full status for all events (even those not checked this round)
+    return ticket_status
 
 @app.route('/api/tickets')
 def get_tickets():
