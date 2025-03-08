@@ -545,17 +545,17 @@
             const container = document.getElementById('tickets-container');
             if (!container) return;
             
-            // First, ensure we have a section for each month
+            // Clear the container first to avoid duplications
+            container.innerHTML = '';
+            
+            // Create a section for each month
             let monthSections = {};
             ['July', 'August', 'September'].forEach(month => {
-                let monthSection = document.querySelector(`.month-section[data-month="${month}"]`);
-                if (!monthSection) {
-                    monthSection = document.createElement('div');
-                    monthSection.className = 'month-section mb-4';
-                    monthSection.setAttribute('data-month', month);
-                    monthSection.innerHTML = `<h2 class="month-title">${month} 2025</h2><div class="row" data-month-row="${month}"></div>`;
-                    container.appendChild(monthSection);
-                }
+                let monthSection = document.createElement('div');
+                monthSection.className = 'month-section mb-4';
+                monthSection.setAttribute('data-month', month);
+                monthSection.innerHTML = `<h2 class="month-title">${month} 2025</h2><div class="row" data-month-row="${month}"></div>`;
+                container.appendChild(monthSection);
                 monthSections[month] = monthSection.querySelector(`[data-month-row="${month}"]`);
             });
             
@@ -569,69 +569,54 @@
                     continue; // Skip if not in our list of concert dates
                 }
                 
-                let ticketCard = document.querySelector(`.ticket-card[data-event-id="${eventId}"]`);
-                if (!ticketCard) {
-                    // Create new card if it doesn't exist
-                    const col = document.createElement('div');
-                    col.className = 'col-md-4 mb-4';
-                    col.innerHTML = `
-                        <div class="card ticket-card" data-event-id="${eventId}">
-                            <div class="status-alert alert-info"></div>
-                            <div class="card-body">
-                                <h5 class="card-title">${event.name}</h5>
-                                <div class="d-flex justify-content-between align-items-center mb-3">
-                                    <span class="badge alert-info status-badge">${event.status}</span>
-                                </div>
-                                <p class="card-text">Last checked: ${event.lastChecked}</p>
-                                <a href="${event.url}" class="btn btn-primary" target="_blank">Check Tickets</a>
+                // Create new card
+                const col = document.createElement('div');
+                col.className = 'col-md-4 mb-4';
+                col.innerHTML = `
+                    <div class="card ticket-card" data-event-id="${eventId}">
+                        <div class="status-alert alert-info"></div>
+                        <div class="card-body">
+                            <h5 class="card-title">${event.name}</h5>
+                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                <span class="badge alert-info status-badge">${event.status}</span>
                             </div>
+                            <p class="card-text">Last checked: ${event.lastChecked}</p>
+                            <a href="${event.url}" class="btn btn-primary" target="_blank">Check Tickets</a>
                         </div>
-                    `;
-                    monthSections[month].appendChild(col);
-                    ticketCard = col.querySelector('.ticket-card');
-                } else {
-                    // Update existing card
-                    const statusBadge = ticketCard.querySelector('.status-badge');
-                    const statusAlert = ticketCard.querySelector('.status-alert');
-                    const lastChecked = ticketCard.querySelector('.card-text');
-                    const ticketLink = ticketCard.querySelector('.btn-primary');
+                    </div>
+                `;
+                monthSections[month].appendChild(col);
+                
+                // Apply the appropriate status alert coloring
+                const ticketCard = col.querySelector('.ticket-card');
+                const statusBadge = ticketCard.querySelector('.status-badge');
+                const statusAlert = ticketCard.querySelector('.status-alert');
+                
+                let alertClass = 'alert-info';
+                if (event.status.includes('Available')) {
+                    alertClass = 'alert-success';
+                    statusBadge.className = 'badge alert-success status-badge';
+                    ticketCard.classList.add('shake');
+                    setTimeout(() => {
+                        ticketCard.classList.remove('shake');
+                    }, 1000);
                     
-                    // Check for changes
-                    const oldStatus = statusBadge.innerText;
-                    const newStatus = event.status;
-                    
-                    // Update UI elements
-                    statusBadge.innerText = newStatus;
-                    lastChecked.innerText = `Last checked: ${event.lastChecked}`;
-                    ticketLink.href = event.url;
-                    
-                    // Apply status alert coloring
-                    let alertClass = 'alert-info';
-                    if (newStatus.includes('Available')) {
-                        alertClass = 'alert-success';
-                        statusBadge.className = 'badge alert-success status-badge';
-                        ticketCard.classList.add('shake');
-                        setTimeout(() => {
-                            ticketCard.classList.remove('shake');
-                        }, 1000);
-                        
-                        // Play sound if enabled and status changed
-                        if (oldStatus !== newStatus && isSoundEnabled()) {
-                            playAlertSound();
-                        }
-                    } else if (newStatus.includes('Soon')) {
-                        alertClass = 'alert-warning';
-                        statusBadge.className = 'badge alert-warning status-badge';
-                    } else if (newStatus.includes('Sold Out')) {
-                        alertClass = 'alert-danger';
-                        statusBadge.className = 'badge alert-danger status-badge';
-                    } else {
-                        statusBadge.className = 'badge alert-info status-badge';
+                    // Play sound if enabled and status changed
+                    if (isSoundEnabled()) {
+                        playAlertSound();
                     }
-                    
-                    // Apply the alert class to the status alert bar
-                    statusAlert.className = `status-alert ${alertClass}`;
+                } else if (event.status.includes('Soon')) {
+                    alertClass = 'alert-warning';
+                    statusBadge.className = 'badge alert-warning status-badge';
+                } else if (event.status.includes('Sold Out')) {
+                    alertClass = 'alert-danger';
+                    statusBadge.className = 'badge alert-danger status-badge';
+                } else {
+                    statusBadge.className = 'badge alert-info status-badge';
                 }
+                
+                // Apply the alert class to the status alert bar
+                statusAlert.className = `status-alert ${alertClass}`;
             }
         }
         
