@@ -3,11 +3,15 @@ from flask import Flask, render_template, jsonify, send_from_directory
 import requests
 from datetime import datetime
 import time
-from bs4 import BeautifulSoup
-import threading
-import logging
 import random
 import json
+from bs4 import BeautifulSoup
+import logging
+from fake_useragent import UserAgent
+import asyncio
+import aiohttp
+import backoff
+from playwright.sync_api import sync_playwright
 from requests.adapters import HTTPAdapter
 from urllib3.util.retry import Retry
 
@@ -267,8 +271,6 @@ def check_ticketera_availability(event_url):
         "Sec-Fetch-Mode": "navigate",
         "Sec-Fetch-Site": "none",
         "Sec-Fetch-User": "?1",
-        "Cache-Control": "max-age=0",
-        "Referer": "https://www.google.com/",
         "DNT": "1",
     }
     
@@ -292,6 +294,47 @@ def check_ticketera_availability(event_url):
         
         # Look for indicators of ticket availability
         if "¡Entradas disponibles!" in response.text or "Comprar ahora" in response.text:
+            # Try to extract actual inventory numbers if available
+            try:
+                # Look for the inventory counter in the JSON data that's often embedded in the page
+                if "ticketsAvailable" in response.text or "availableCount" in response.text or "stockLevel" in response.text:
+                    # Try to extract JSON data from script tags
+                    scripts = soup.find_all('script')
+                    inventory_count = None
+                    
+                    for script in scripts:
+                        script_text = script.string if script.string else ""
+                        # Look for inventory-related JSON
+                        if "ticketsAvailable" in script_text or "availableCount" in script_text or "stockLevel" in script_text:
+                            try:
+                                # Find JSON objects in the script
+                                json_start = script_text.find('{')
+                                json_end = script_text.rfind('}') + 1
+                                if json_start >= 0 and json_end > json_start:
+                                    json_str = script_text[json_start:json_end]
+                                    # Try to clean and parse the JSON
+                                    json_data = json.loads(json_str)
+                                    # Look for inventory fields using various common names
+                                    for field in ['ticketsAvailable', 'availableCount', 'stockLevel', 'inventory', 'available', 'stock']:
+                                        if field in json_data:
+                                            inventory_count = json_data[field]
+                                            break
+                            except Exception as e:
+                                print(f"Error parsing JSON from script: {e}")
+                    
+                    if inventory_count is not None:
+                        return f"🔥 TICKETS AVAILABLE! {inventory_count} tickets in stock 🔥"
+                
+                # If we couldn't get exact inventory, try to find inventory indicators in the HTML
+                inventory_elements = soup.select('[data-inventory], [data-stock], .inventory-count, .stock-level, .tickets-available')
+                for element in inventory_elements:
+                    if element.get_text().strip() and any(c.isdigit() for c in element.get_text()):
+                        inventory_text = element.get_text().strip()
+                        return f"🔥 TICKETS AVAILABLE! Stock: {inventory_text} 🔥"
+            except Exception as e:
+                print(f"Error trying to extract inventory: {e}")
+                
+            # If all inventory extraction fails, just return the basic availability message
             return "🔥 TICKETS AVAILABLE! CHECK NOW 🔥"
         elif "coming soon" in response.text.lower() or "próximamente" in response.text.lower():
             return "⚡ Coming Soon"
@@ -375,6 +418,49 @@ def check_with_playwright(event_url):
             
             # Check for ticket availability indicators in the content
             if "¡Entradas disponibles!" in content or "Comprar ahora" in content:
+                # Try to extract actual inventory numbers if available
+                try:
+                    # Look for the inventory counter in the JSON data that's often embedded in the page
+                    if "ticketsAvailable" in content or "availableCount" in content or "stockLevel" in content:
+                        # Try to extract JSON data from script tags
+                        scripts = page.query_selector_all('script')
+                        inventory_count = None
+                        
+                        for script in scripts:
+                            script_text = script.inner_text()
+                            # Look for inventory-related JSON
+                            if "ticketsAvailable" in script_text or "availableCount" in script_text or "stockLevel" in script_text:
+                                try:
+                                    # Find JSON objects in the script
+                                    json_start = script_text.find('{')
+                                    json_end = script_text.rfind('}') + 1
+                                    if json_start >= 0 and json_end > json_start:
+                                        json_str = script_text[json_start:json_end]
+                                        # Try to clean and parse the JSON
+                                        json_data = json.loads(json_str)
+                                        # Look for inventory fields using various common names
+                                        for field in ['ticketsAvailable', 'availableCount', 'stockLevel', 'inventory', 'available', 'stock']:
+                                            if field in json_data:
+                                                inventory_count = json_data[field]
+                                                break
+                                except Exception as e:
+                                    print(f"Error parsing JSON from script: {e}")
+                        
+                        if inventory_count is not None:
+                            browser.close()
+                            return f"🔥 TICKETS AVAILABLE! {inventory_count} tickets in stock 🔥"
+                    
+                    # If we couldn't get exact inventory, try to find inventory indicators in the HTML
+                    inventory_elements = page.query_selector_all('[data-inventory], [data-stock], .inventory-count, .stock-level, .tickets-available')
+                    for element in inventory_elements:
+                        if element.inner_text().strip() and any(c.isdigit() for c in element.inner_text()):
+                            inventory_text = element.inner_text().strip()
+                            browser.close()
+                            return f"🔥 TICKETS AVAILABLE! Stock: {inventory_text} 🔥"
+                except Exception as e:
+                    print(f"Error trying to extract inventory: {e}")
+                    
+                # If all inventory extraction fails, just return the basic availability message
                 browser.close()
                 return "🔥 TICKETS AVAILABLE! CHECK NOW 🔥"
             elif "coming soon" in content.lower() or "próximamente" in content.lower():
