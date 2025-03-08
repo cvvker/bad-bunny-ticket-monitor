@@ -193,7 +193,7 @@
                 <button class="btn btn-sm btn-outline-light ms-2" onclick="toggleSound()">Toggle Sound</button>
             </p>
             <p class="mt-2 mb-0">
-                <i class="fas fa-refresh me-2"></i> UI updates every <strong>15 seconds</strong> | Server checks Ticketera every <strong>60 seconds</strong> (to avoid bot detection)
+                <i class="fas fa-refresh me-2"></i> Server checks Ticketera every <strong>15 seconds</strong> (to avoid bot detection) | Countdown timer updates every second
             </p>
         </div>
         
@@ -290,8 +290,8 @@
     </script>
 
     <script>
-        const SERVER_CHECK_INTERVAL = 60000; // Every 60 seconds: How often the server checks Ticketera (to avoid bot detection)
-        const UI_UPDATE_INTERVAL = 15000;    // Every 15 seconds: How often the UI refreshes (for responsive experience)
+        const SERVER_CHECK_INTERVAL = 15000; // Every 15 seconds: How often the server checks Ticketera
+        const COUNTDOWN_UPDATE_INTERVAL = 1000; // Update countdown timer every second
         
         // Bad Bunny concert dates - hardcoded to ensure they always display
         const CONCERT_DATES = {
@@ -386,18 +386,9 @@
             
             // Use the UI update interval for countdown display, but sync with server checks
             const timeUntilServerCheck = SERVER_CHECK_INTERVAL - ((currentTime - lastCheckTime) % SERVER_CHECK_INTERVAL);
-            const timeUntilUIUpdate = UI_UPDATE_INTERVAL - ((currentTime - lastCheckTime) % UI_UPDATE_INTERVAL);
             
-            // When close to a server check, show that countdown, otherwise show UI update countdown
-            if (timeUntilServerCheck <= UI_UPDATE_INTERVAL) {
-                targetInterval = timeUntilServerCheck;
-                document.getElementById('checkingLabel').textContent = "Server Check In:";
-            } else {
-                targetInterval = timeUntilUIUpdate;
-                document.getElementById('checkingLabel').textContent = "UI Update In:";
-            }
-            
-            const remainingSeconds = Math.ceil(targetInterval / 1000);
+            // When close to a server check, show that countdown
+            const remainingSeconds = Math.ceil(timeUntilServerCheck / 1000);
             
             // Update the countdown display
             const countdownNumber = document.querySelector('.countdown-number');
@@ -408,19 +399,19 @@
             // Update the progress circle
             const progressCircle = document.querySelector('.countdown-circle .progress');
             if (progressCircle) {
-                const dashoffset = 283 * (targetInterval / (targetInterval === timeUntilServerCheck ? SERVER_CHECK_INTERVAL : UI_UPDATE_INTERVAL));
+                const dashoffset = 283 * (timeUntilServerCheck / SERVER_CHECK_INTERVAL);
                 progressCircle.style.strokeDashoffset = dashoffset;
             }
             
             // Update the next check time
             const nextCheckTime = document.getElementById('nextCheckTime');
             if (nextCheckTime) {
-                const nextCheck = new Date(currentTime.getTime() + targetInterval);
+                const nextCheck = new Date(currentTime.getTime() + timeUntilServerCheck);
                 nextCheckTime.textContent = nextCheck.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
             }
             
             // Schedule the next update
-            setTimeout(updateCountdown, 100);
+            setTimeout(updateCountdown, COUNTDOWN_UPDATE_INTERVAL);
         }
 
         function createEventCard(id, event) {
@@ -654,10 +645,7 @@
             updateCountdown();
             
             // Set intervals for regular updates
-            // Frequent UI updates from cached data (15 seconds)
-            setInterval(() => updateTicketData(), UI_UPDATE_INTERVAL);
-            
-            // Occasional server data fetches (60 seconds)
+            // Occasional server data fetches (15 seconds)
             setInterval(() => updateTicketData(), SERVER_CHECK_INTERVAL);
         }
         
