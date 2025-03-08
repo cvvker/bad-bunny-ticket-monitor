@@ -378,6 +378,30 @@
                         'September': []
                     };
 
+                    // If data is empty or has errors, create fallback data
+                    if (Object.keys(data).length === 0 || data.error) {
+                        // Add fallback data for all dates from memory
+                        const fallbackDates = {
+                            'July': ['12', '18', '19'],
+                            'August': ['1', '2', '3', '8', '9', '10', '15', '16', '17', '22', '23', '24', '29', '30', '31'],
+                            'September': ['5', '6', '7', '12', '13', '14']
+                        };
+                        
+                        Object.entries(fallbackDates).forEach(([month, days]) => {
+                            days.forEach(day => {
+                                const id = `${month.toLowerCase()}-${day}`;
+                                const date = `${month} ${day}, 2025`;
+                                data[id] = {
+                                    name: `Bad Bunny - ${date}`,
+                                    date: date,
+                                    status: "⚡ Not Yet Available",
+                                    url: `#${month}-${day}`,
+                                    lastChecked: new Date().toLocaleTimeString()
+                                };
+                            });
+                        });
+                    }
+
                     Object.entries(data).forEach(([id, event]) => {
                         const month = event.date.split(',')[0].trim();
                         if (months[month]) {

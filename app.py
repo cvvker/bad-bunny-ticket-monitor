@@ -6,6 +6,10 @@ import time
 from bs4 import BeautifulSoup
 import threading
 import logging
+import random
+import json
+from requests.adapters import HTTPAdapter
+from urllib3.util.retry import Retry
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -61,6 +65,7 @@ app = Flask(__name__)
 # Global state
 ticket_status = {}
 last_check = None
+last_update_time = {}  # Track last update time per event to distribute requests
 
 def format_date(month, day):
     return f"{month} {day}, 2025"
@@ -110,9 +115,33 @@ def send_discord_notification(message, title, description, url=None, is_urgent=F
 
 def check_ticketera_availability(event_url):
     try:
+        # Create a session with retry capability
         session = requests.Session()
+        
+        # Configure retry strategy
+        retry_strategy = Retry(
+            total=3,
+            backoff_factor=0.5,
+            status_forcelist=[429, 500, 502, 503, 504],
+            allowed_methods=["GET"]
+        )
+        
+        adapter = HTTPAdapter(max_retries=retry_strategy)
+        session.mount("http://", adapter)
+        session.mount("https://", adapter)
+        
+        # Rotate user agents
+        user_agents = [
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.2210.91',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:109.0) Gecko/20100101 Firefox/115.0',
+            'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15',
+            'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36 OPR/107.0.0.0'
+        ]
+        
+        # Browser-like headers
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+            'User-Agent': random.choice(user_agents),
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8',
             'Accept-Language': 'en-US,en;q=0.9,es;q=0.8',
             'Accept-Encoding': 'gzip, deflate, br',
@@ -125,10 +154,32 @@ def check_ticketera_availability(event_url):
             'Sec-Fetch-Mode': 'navigate',
             'Sec-Fetch-Site': 'none',
             'Sec-Fetch-User': '?1',
-            'Upgrade-Insecure-Requests': '1'
+            'Upgrade-Insecure-Requests': '1',
+            'Referer': 'https://choli.ticketera.com/'
         }
         
-        response = session.get(event_url, headers=headers, timeout=10)
+        # Add cookies to simulate a real browser
+        cookies = {
+            'visited': 'true',
+            'session_id': f'{random.randint(1000000, 9999999)}',
+            'locale': 'es-PR',
+            'timezone': 'America/Puerto_Rico'
+        }
+        
+        # Simulate some delay like a real user would have
+        time.sleep(random.uniform(0.5, 2.0))
+        
+        # First, make a request to the homepage to get cookies
+        try:
+            home_response = session.get('https://choli.ticketera.com/', headers=headers, timeout=10)
+            # Extract any cookies from the response
+            for cookie in home_response.cookies:
+                session.cookies.set(cookie.name, cookie.value)
+        except Exception as e:
+            logger.warning(f"Could not get homepage cookies: {e}")
+        
+        # Make the request to the event URL
+        response = session.get(event_url, headers=headers, cookies=cookies, timeout=15)
         response.raise_for_status()
         
         soup = BeautifulSoup(response.text, 'html.parser')
@@ -168,50 +219,122 @@ def check_ticketera_availability(event_url):
         return "⚡ Error checking availability"
 
 def update_ticket_status():
-    global ticket_status, last_check
+    global ticket_status, last_check, last_update_time
     
     try:
         current_status = {}
+        current_time = datetime.now()
         
+        # If we have previous status data, use it as a starting point
+        if ticket_status:
+            current_status = ticket_status.copy()
+        
+        # Get all dates to check
+        all_dates = []
         for month, days in CONCERT_DATES.items():
             for day in days:
-                event_url = generate_event_url(month, day)
-                if not event_url:
-                    logger.error(f"No URL found for {month} {day}")
-                    continue
-                    
-                status = check_ticketera_availability(event_url)
-                date = format_date(month, day)
-                
                 event_id = f"{month.lower()}-{day}"
-                previous_status = ticket_status.get(event_id, {}).get('status')
-                
-                current_status[event_id] = {
-                    'name': f"Bad Bunny - {date}",
-                    'date': date,
-                    'status': status,
-                    'url': event_url,
-                    'lastChecked': datetime.now().strftime('%I:%M:%S %p')
-                }
-                
-                # Send notification if status changed
-                if previous_status and previous_status != status:
-                    is_urgent = "AVAILABLE" in status or "CHECK NOW" in status
-                    send_discord_notification(
-                        f"Status changed for {date}!",
-                        f"Ticket Status Update - {date}",
-                        f"Previous status: {previous_status}\nNew status: {status}",
-                        event_url,
-                        is_urgent
-                    )
+                all_dates.append((month, day, event_id))
         
+        # Shuffle dates to randomize check order
+        random.shuffle(all_dates)
+        
+        # Only check a subset of dates each time to avoid too many requests at once
+        # This helps avoid triggering rate limits and makes the requests look more natural
+        max_checks = min(5, len(all_dates))
+        dates_to_check = []
+        
+        # Prioritize dates that haven't been checked recently
+        for month, day, event_id in all_dates:
+            last_update = last_update_time.get(event_id, datetime.min)
+            time_since_update = (current_time - last_update).total_seconds()
+            
+            # If it's been over 5 minutes since this date was last checked, consider checking it
+            if time_since_update > 300:
+                dates_to_check.append((month, day, event_id))
+                if len(dates_to_check) >= max_checks:
+                    break
+        
+        # If we don't have enough dates due for checking, add some random ones
+        if len(dates_to_check) < max_checks:
+            remaining_dates = [date for date in all_dates if date not in dates_to_check]
+            random.shuffle(remaining_dates)
+            dates_to_check.extend(remaining_dates[:max_checks - len(dates_to_check)])
+        
+        # Check each selected date
+        for month, day, event_id in dates_to_check:
+            event_url = generate_event_url(month, day)
+            if not event_url:
+                logger.error(f"No URL found for {month} {day}")
+                continue
+                
+            try:
+                status = check_ticketera_availability(event_url)
+                last_update_time[event_id] = current_time
+            except Exception as e:
+                logger.error(f"Error checking {month} {day}: {e}")
+                # Use previously known status or fallback
+                if event_id in ticket_status:
+                    status = ticket_status[event_id].get('status', "⚡ Not Yet Available")
+                else:
+                    status = "⚡ Not Yet Available"
+            
+            date = format_date(month, day)
+            previous_status = ticket_status.get(event_id, {}).get('status')
+            
+            current_status[event_id] = {
+                'name': f"Bad Bunny - {date}",
+                'date': date,
+                'status': status,
+                'url': event_url,
+                'lastChecked': current_time.strftime('%I:%M:%S %p')
+            }
+            
+            # Send notification if status changed
+            if previous_status and previous_status != status:
+                is_urgent = "AVAILABLE" in status or "CHECK NOW" in status
+                send_discord_notification(
+                    f"Status changed for {date}!",
+                    f"Bad Bunny - {date}",
+                    f"Previous status: {previous_status}\nNew status: {status}",
+                    event_url,
+                    is_urgent
+                )
+        
+        # Add any missing dates to ensure all dates appear in the UI
+        for month, days in CONCERT_DATES.items():
+            for day in days:
+                event_id = f"{month.lower()}-{day}"
+                if event_id not in current_status:
+                    date = format_date(month, day)
+                    event_url = generate_event_url(month, day)
+                    if not event_url:
+                        continue
+                        
+                    # Use previously known status or fallback
+                    if event_id in ticket_status:
+                        status = ticket_status[event_id].get('status', "⚡ Not Yet Available")
+                    else:
+                        status = "⚡ Not Yet Available"
+                        
+                    current_status[event_id] = {
+                        'name': f"Bad Bunny - {date}",
+                        'date': date,
+                        'status': status,
+                        'url': event_url,
+                        'lastChecked': "Pending..."
+                    }
+        
+        # Update the global ticket status
         ticket_status = current_status
-        last_check = datetime.now()
+        last_check = current_time
+        
         logger.info("Ticket status updated successfully")
+        return ticket_status
         
     except Exception as e:
         logger.error(f"Error updating ticket status: {e}")
-        return {"error": str(e)}
+        return ticket_status
 
 @app.route('/api/tickets')
 def get_tickets():
