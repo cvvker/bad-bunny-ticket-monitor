@@ -88,8 +88,8 @@ app = Flask(__name__)
 logger = app.logger
 
 # Monitoring settings
-BASE_CHECK_INTERVAL = 15  # Base interval in seconds as per user requirements
-JITTER_MAX = 5   # Maximum random delay to add to each check (in seconds)
+BASE_CHECK_INTERVAL = 60  # Base interval in seconds to avoid anti-bot detection
+JITTER_MAX = 30  # Maximum random delay to add to each check (in seconds)
 MAX_DATES_PER_CHECK = 3  # Only check a few dates each interval
 CHECK_INTERVAL = int(os.environ.get('CHECK_INTERVAL', BASE_CHECK_INTERVAL))
 DISCORD_WEBHOOK_URL = os.environ.get('DISCORD_WEBHOOK_URL', 'https://discord.com/api/webhooks/1347702022039666783/IIgJ2B6vT5aQoTjNOadVxdAviHuEsCRR8zwu4CgWAvWzcob9BJ0_5XQC-BTyVauTljR_')

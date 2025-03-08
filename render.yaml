@@ -8,7 +8,7 @@ services:
       - key: PYTHON_VERSION
         value: 3.11.2
       - key: CHECK_INTERVAL
-        value: "15"  # Set back to 15 seconds as per user requirements
+        value: "60"  # Using 60 seconds to avoid anti-bot detection
       - key: DISCORD_WEBHOOK_URL
         value: "https://discord.com/api/webhooks/1347702022039666783/IIgJ2B6vT5aQoTjNOadVxdAviHuEsCRR8zwu4CgWAvWzcob9BJ0_5XQC-BTyVauTljR_"
       - key: PYTHONUNBUFFERED

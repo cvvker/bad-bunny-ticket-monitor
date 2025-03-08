@@ -201,7 +201,18 @@
 
     <script>
         const SERVER_CHECK_INTERVAL = 60000; // 60 seconds in milliseconds
-        const UI_UPDATE_INTERVAL = 15000;    // Still update UI frequently (15 seconds)
+        const UI_UPDATE_INTERVAL = 15000;    // UI updates every 15 seconds
+        
+        // Bad Bunny concert dates - hardcoded to ensure they always display
+        const CONCERT_DATES = {
+            'July': ['12', '18', '19'],
+            'August': ['1', '2', '3', '8', '9', '10', '15', '16', '17', '22', '23', '24', '29', '30', '31'],
+            'September': ['5', '6', '7', '12', '13', '14']
+        };
+
+        // Always generate fallback data for all dates at startup
+        const FALLBACK_DATA = generateFallbackData();
+        let cachedData = FALLBACK_DATA;  // Start with fallback data immediately
         
         function toggleSound() {
             const soundEnabled = localStorage.getItem('soundEnabled') === 'true';
@@ -278,7 +289,6 @@
 
         let previousStates = {};
         let lastCheckTime = new Date();
-        let cachedData = null;  // Store the last successful data
 
         function updateCountdown() {
             const currentTime = new Date();
@@ -357,13 +367,6 @@
             
             return col;
         }
-
-        // Hardcoded Bad Bunny concert dates - ensure these match the server-side configuration
-        const CONCERT_DATES = {
-            'July': ['12', '18', '19'],
-            'August': ['1', '2', '3', '8', '9', '10', '15', '16', '17', '22', '23', '24', '29', '30', '31'],
-            'September': ['5', '6', '7', '12', '13', '14']
-        };
 
         // Generates fallback data for all dates
         function generateFallbackData() {
