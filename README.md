@@ -8,8 +8,11 @@ Automated ticket monitoring system for Bad Bunny concerts in 2025. Monitors Tick
 - 15-second check interval
 - Discord notifications with @everyone mentions for urgent updates
 - Visual indicators and sound alerts
+  - Customizable sounds (upload your own or choose from presets)
+  - Toggle sound alerts on/off
 - Real-time status tracking
 - Countdown timer
+- Auto-deployment enabled (changes deploy automatically)
 
 ## Deployment on Render
 
