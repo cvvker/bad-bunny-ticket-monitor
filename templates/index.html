@@ -200,89 +200,79 @@
     </audio>
 
     <script>
-        let soundEnabled = true;
-        let lastPlayedTime = 0;
-        const MIN_PLAY_INTERVAL = 1000; // Minimum 1 second between plays
-
-        // Initialize sound preference from localStorage
-        try {
-            const savedSound = localStorage.getItem('soundEnabled');
-            if (savedSound !== null) {
-                soundEnabled = savedSound === 'true';
-            }
-        } catch (e) {
-            console.error('Error accessing localStorage:', e);
-        }
-
         function toggleSound() {
-            soundEnabled = !soundEnabled;
-            try {
-                localStorage.setItem('soundEnabled', soundEnabled);
-            } catch (e) {
-                console.error('Error saving sound preference:', e);
-            }
+            const soundEnabled = localStorage.getItem('soundEnabled') === 'true';
+            localStorage.setItem('soundEnabled', (!soundEnabled).toString());
             updateSoundButton();
-            // Play test sound when enabling
-            if (soundEnabled) {
-                playAlertSound();
-            }
         }
 
         function updateSoundButton() {
+            const soundEnabled = localStorage.getItem('soundEnabled') === 'true';
             const button = document.getElementById('soundToggle');
-            button.innerHTML = soundEnabled ? '🔔 Sound ON' : '🔕 Sound OFF';
-            button.classList.toggle('btn-success', soundEnabled);
-            button.classList.toggle('btn-secondary', !soundEnabled);
+            if (soundEnabled) {
+                button.innerHTML = '🔔 Sound ON';
+                button.className = 'btn btn-success';
+            } else {
+                button.innerHTML = '🔕 Sound OFF';
+                button.className = 'btn btn-secondary';
+            }
         }
 
-        async function playAlertSound() {
-            if (!soundEnabled) return;
-            
-            const now = Date.now();
-            if (now - lastPlayedTime < MIN_PLAY_INTERVAL) {
-                console.log('Skipping sound, too soon after last play');
+        function playAlertSound() {
+            const soundEnabled = localStorage.getItem('soundEnabled') === 'true';
+            if (!soundEnabled) {
                 return;
             }
 
             const audio = document.getElementById('alertSound');
             
+            // Reset the audio to the beginning
             try {
-                // Reset and load the audio
+                audio.pause();
                 audio.currentTime = 0;
-                await audio.load();
-                
-                // Create and start a new play promise
-                const playPromise = audio.play();
-                if (playPromise !== undefined) {
-                    playPromise
-                        .then(() => {
-                            lastPlayedTime = now;
-                            console.log('Sound played successfully');
-                        })
-                        .catch(error => {
-                            console.error('Error playing sound:', error);
-                            // Try to play again with user interaction
-                            const retryPlay = () => {
-                                audio.play()
-                                    .then(() => lastPlayedTime = Date.now())
-                                    .catch(e => console.error('Retry failed:', e));
-                                document.removeEventListener('click', retryPlay);
-                            };
-                            document.addEventListener('click', retryPlay, { once: true });
-                        });
-                }
             } catch (e) {
-                console.error('Error in playAlertSound:', e);
+                console.error("Error resetting audio:", e);
             }
+            
+            // Try to play with retries
+            let attempts = 0;
+            const maxAttempts = 3;
+            
+            const attemptPlay = () => {
+                attempts++;
+                
+                const playPromise = audio.play();
+                
+                if (playPromise !== undefined) {
+                    playPromise.then(() => {
+                        console.log("Audio played successfully");
+                    }).catch(error => {
+                        console.error("Error playing audio:", error);
+                        
+                        // If user interaction required, show alert
+                        if (error.name === "NotAllowedError") {
+                            alert("Please interact with the page to enable sound notifications");
+                        }
+                        
+                        // Retry if not reached max attempts
+                        if (attempts < maxAttempts) {
+                            setTimeout(attemptPlay, 1000);
+                        }
+                    });
+                }
+            };
+            
+            attemptPlay();
         }
 
         function testNotification() {
+            playAlertSound();
+            
             const testCard = document.querySelector('.ticket-card');
             if (testCard) {
                 testCard.classList.add('urgent-alert');
-                setTimeout(() => testCard.classList.remove('urgent-alert'), 2000);
+                setTimeout(() => testCard.classList.remove('urgent-alert'), 3000);
             }
-            playAlertSound();
         }
 
         let previousStates = {};
@@ -290,194 +280,219 @@
         let lastCheckTime = new Date();
 
         function updateCountdown() {
-            const now = new Date();
-            const timeSinceLastCheck = now - lastCheckTime;
-            const timeUntilNextCheck = Math.max(0, CHECK_INTERVAL - timeSinceLastCheck);
-            const secondsLeft = Math.ceil(timeUntilNextCheck / 1000);
+            const currentTime = new Date();
+            const elapsedMs = currentTime - lastCheckTime;
+            const remainingMs = Math.max(0, CHECK_INTERVAL - elapsedMs);
+            const remainingSeconds = Math.ceil(remainingMs / 1000);
             
-            // Update countdown number
+            // Update the countdown display
             const countdownNumber = document.querySelector('.countdown-number');
-            countdownNumber.textContent = secondsLeft;
+            if (countdownNumber) {
+                countdownNumber.textContent = remainingSeconds;
+            }
             
-            // Update progress circle
-            const progress = document.querySelector('.countdown-circle .progress');
-            const percentage = (timeUntilNextCheck / CHECK_INTERVAL) * 100;
-            const dashOffset = 283 * (1 - percentage / 100);
-            progress.style.strokeDashoffset = dashOffset;
+            // Update the progress circle
+            const progressCircle = document.querySelector('.countdown-circle .progress');
+            if (progressCircle) {
+                const dashoffset = 283 * (remainingMs / CHECK_INTERVAL);
+                progressCircle.style.strokeDashoffset = dashoffset;
+            }
             
-            // Update next check time
-            const nextCheckTime = new Date(lastCheckTime.getTime() + CHECK_INTERVAL);
-            document.getElementById('nextCheckTime').textContent = 
-                nextCheckTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            // Update the next check time
+            const nextCheckTime = document.getElementById('nextCheckTime');
+            if (nextCheckTime) {
+                const nextCheck = new Date(lastCheckTime.getTime() + CHECK_INTERVAL);
+                nextCheckTime.textContent = nextCheck.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+            }
+            
+            // Schedule the next update
+            setTimeout(updateCountdown, 100);
         }
 
         function createEventCard(id, event) {
-            const div = document.createElement('div');
-            div.className = 'col-md-4 mb-4';
-            div.setAttribute('data-event-id', id);
+            const col = document.createElement('div');
+            col.className = 'col-md-4 mb-4';
             
+            // Determine the appropriate status class
             let statusClass = 'alert-info';
-            let urgencyClass = '';
+            let statusText = event.status || "⚡ Not Yet Available";
             
-            if (event.status.includes('AVAILABLE')) {
+            if (statusText.includes('AVAILABLE')) {
                 statusClass = 'alert-success';
-                urgencyClass = 'urgent-alert';
-            } else if (event.status.includes('Not Available')) {
-                statusClass = 'alert-danger';
-            } else if (event.status.includes('CHECK NOW')) {
+            } else if (statusText.includes('CHECK NOW')) {
                 statusClass = 'alert-warning';
-                urgencyClass = 'urgent-alert';
+            } else if (statusText.includes('Not Available')) {
+                statusClass = 'alert-danger';
             }
-
-            div.innerHTML = `
-                <div class="card ticket-card ${urgencyClass}">
+            
+            col.innerHTML = `
+                <div class="card ticket-card" data-event-id="${id}">
                     <div class="status-alert ${statusClass}"></div>
                     <div class="card-body">
                         <h5 class="card-title">${event.name}</h5>
-                        <div class="status-badge badge ${statusClass} mb-2">
-                            ${event.status}
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <span class="badge ${statusClass} status-badge">${statusText}</span>
                         </div>
-                        <p class="card-text">
-                            <small class="text-muted">
-                                Last checked: ${event.lastChecked}
-                            </small>
-                        </p>
-                        ${event.url ? `
-                            <a href="${event.url}" target="_blank" class="btn btn-primary btn-sm">
-                                Check Tickets 🎟️
-                            </a>
-                        ` : ''}
+                        <p class="card-text">Last checked: ${event.lastChecked || "Pending..."}</p>
+                        <a href="${event.url}" class="btn btn-primary" target="_blank">Check Tickets</a>
                     </div>
                 </div>
             `;
+            
+            return col;
+        }
 
-            // Add click handler to play sound when urgent
-            if (urgencyClass) {
-                const card = div.querySelector('.ticket-card');
-                card.addEventListener('click', () => {
-                    if (event.status.includes('AVAILABLE')) {
-                        playAlertSound();
-                    }
+        // Hardcoded Bad Bunny concert dates
+        const CONCERT_DATES = {
+            'July': ['12', '18', '19'],
+            'August': ['1', '2', '3', '8', '9', '10', '15', '16', '17', '22', '23', '24', '29', '30', '31'],
+            'September': ['5', '6', '7', '12', '13', '14']
+        };
+
+        // Generates fallback data for all dates
+        function generateFallbackData() {
+            const fallbackData = {};
+            
+            Object.entries(CONCERT_DATES).forEach(([month, days]) => {
+                days.forEach(day => {
+                    const id = `${month.toLowerCase()}-${day}`;
+                    const date = `${month} ${day}, 2025`;
+                    fallbackData[id] = {
+                        name: `Bad Bunny - ${date}`,
+                        date: date,
+                        status: "⚡ Not Yet Available",
+                        url: `https://choli.ticketera.com/`,
+                        lastChecked: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
+                    };
                 });
-            }
-
-            return div;
+            });
+            
+            return fallbackData;
         }
 
         function updateDisplay() {
+            // Try to fetch from the API first
             fetch('/api/tickets')
                 .then(response => response.json())
                 .then(data => {
-                    const container = document.getElementById('tickets-container');
-                    container.innerHTML = '';
-
-                    // Group events by month
-                    const months = {
-                        'July': [],
-                        'August': [],
-                        'September': []
-                    };
-
-                    // If data is empty or has errors, create fallback data
-                    if (Object.keys(data).length === 0 || data.error) {
-                        // Add fallback data for all dates from memory
-                        const fallbackDates = {
-                            'July': ['12', '18', '19'],
-                            'August': ['1', '2', '3', '8', '9', '10', '15', '16', '17', '22', '23', '24', '29', '30', '31'],
-                            'September': ['5', '6', '7', '12', '13', '14']
-                        };
-                        
-                        Object.entries(fallbackDates).forEach(([month, days]) => {
-                            days.forEach(day => {
-                                const id = `${month.toLowerCase()}-${day}`;
-                                const date = `${month} ${day}, 2025`;
-                                data[id] = {
-                                    name: `Bad Bunny - ${date}`,
-                                    date: date,
-                                    status: "⚡ Not Yet Available",
-                                    url: `#${month}-${day}`,
-                                    lastChecked: new Date().toLocaleTimeString()
-                                };
-                            });
-                        });
-                    }
-
-                    Object.entries(data).forEach(([id, event]) => {
-                        const month = event.date.split(',')[0].trim();
-                        if (months[month]) {
-                            months[month].push({ id, ...event });
-                        }
-                    });
-
-                    // Sort events within each month by day
-                    Object.values(months).forEach(monthEvents => {
-                        monthEvents.sort((a, b) => {
-                            const dayA = parseInt(a.date.split(',')[0].split(' ')[1]);
-                            const dayB = parseInt(b.date.split(',')[0].split(' ')[1]);
-                            return dayA - dayB;
-                        });
-                    });
-
-                    // Check for status changes and trigger notifications
-                    Object.entries(data).forEach(([id, event]) => {
-                        const prevStatus = previousStates[id]?.status;
-                        const currentStatus = event.status;
-
-                        if (prevStatus && prevStatus !== currentStatus) {
-                            if (currentStatus.includes('AVAILABLE')) {
-                                playAlertSound();
-                                const card = document.querySelector(`[data-event-id="${id}"]`);
-                                if (card) {
-                                    card.classList.add('urgent-alert');
-                                    setTimeout(() => card.classList.remove('urgent-alert'), 5000);
-                                }
-                            } else if (currentStatus.includes('CHECK NOW')) {
-                                playAlertSound();
-                            }
-                        }
-                    });
-
-                    // Update previous states
-                    previousStates = Object.entries(data).reduce((acc, [id, event]) => {
-                        acc[id] = { status: event.status };
-                        return acc;
-                    }, {});
-
-                    // Display events in order
-                    ['July', 'August', 'September'].forEach(month => {
-                        if (months[month].length > 0) {
-                            const monthDiv = document.createElement('div');
-                            monthDiv.className = 'month-section mb-4';
-                            monthDiv.innerHTML = `<h2 class="month-title">${month} 2025</h2>`;
-                            container.appendChild(monthDiv);
-
-                            const row = document.createElement('div');
-                            row.className = 'row';
-                            months[month].forEach(event => {
-                                row.appendChild(createEventCard(event.id, event));
-                            });
-                            container.appendChild(row);
-                        }
-                    });
-
-                    // Update last check time
-                    lastCheckTime = new Date();
-                    updateCountdown();
+                    // Handle the API response or use fallback data
+                    processTicketData(data);
                 })
                 .catch(error => {
+                    // On API error, use fallback data
                     console.error('Error fetching tickets:', error);
+                    const fallbackData = generateFallbackData();
+                    processTicketData(fallbackData);
                 });
         }
 
+        function processTicketData(data) {
+            const container = document.getElementById('tickets-container');
+            container.innerHTML = '';
+
+            // If data is empty or has errors, use fallback data
+            if (!data || Object.keys(data).length === 0 || data.error) {
+                data = generateFallbackData();
+            }
+
+            // Group events by month
+            const months = {
+                'July': [],
+                'August': [],
+                'September': []
+            };
+
+            Object.entries(data).forEach(([id, event]) => {
+                const month = event.date ? event.date.split(',')[0].trim() : null;
+                if (month && months[month]) {
+                    months[month].push({ id, ...event });
+                }
+            });
+
+            // Add any missing dates that should be displayed
+            Object.entries(CONCERT_DATES).forEach(([month, days]) => {
+                days.forEach(day => {
+                    const id = `${month.toLowerCase()}-${day}`;
+                    // If this date is not in our data, add it with default values
+                    if (!data[id]) {
+                        const date = `${month} ${day}, 2025`;
+                        const event = {
+                            name: `Bad Bunny - ${date}`,
+                            date: date,
+                            status: "⚡ Not Yet Available",
+                            url: `https://choli.ticketera.com/`,
+                            lastChecked: "Pending..."
+                        };
+                        months[month].push({ id, ...event });
+                    }
+                });
+            });
+
+            // Sort events within each month by day
+            Object.values(months).forEach(monthEvents => {
+                monthEvents.sort((a, b) => {
+                    if (!a.date || !b.date) return 0;
+                    const dayA = parseInt(a.date.split(',')[0].split(' ')[1]);
+                    const dayB = parseInt(b.date.split(',')[0].split(' ')[1]);
+                    return dayA - dayB;
+                });
+            });
+
+            // Check for status changes and trigger notifications
+            Object.entries(data).forEach(([id, event]) => {
+                const prevStatus = previousStates[id]?.status;
+                const currentStatus = event.status;
+
+                if (prevStatus && prevStatus !== currentStatus) {
+                    if (currentStatus && currentStatus.includes('AVAILABLE')) {
+                        playAlertSound();
+                        const card = document.querySelector(`[data-event-id="${id}"]`);
+                        if (card) {
+                            card.classList.add('urgent-alert');
+                            setTimeout(() => card.classList.remove('urgent-alert'), 5000);
+                        }
+                    } else if (currentStatus && currentStatus.includes('CHECK NOW')) {
+                        playAlertSound();
+                    }
+                }
+            });
+
+            // Update previous states
+            previousStates = Object.entries(data).reduce((acc, [id, event]) => {
+                acc[id] = { status: event.status };
+                return acc;
+            }, {});
+
+            // Display events in order
+            ['July', 'August', 'September'].forEach(month => {
+                if (months[month] && months[month].length > 0) {
+                    const monthDiv = document.createElement('div');
+                    monthDiv.className = 'month-section mb-4';
+                    monthDiv.innerHTML = `<h2 class="month-title">${month} 2025</h2>`;
+                    container.appendChild(monthDiv);
+
+                    const row = document.createElement('div');
+                    row.className = 'row';
+                    months[month].forEach(event => {
+                        row.appendChild(createEventCard(event.id, event));
+                    });
+                    container.appendChild(row);
+                }
+            });
+
+            // Update last check time
+            lastCheckTime = new Date();
+            updateCountdown();
+        }
+
         // Initialize
+        localStorage.setItem('soundEnabled', 'true');
         updateSoundButton();
         updateDisplay();
+        updateCountdown();
+        
+        // Set interval for regular updates
         setInterval(updateDisplay, CHECK_INTERVAL);
-        setInterval(updateCountdown, 1000);
-
-        // Test audio loading
-        const audio = document.getElementById('alertSound');
-        audio.load();
     </script>
 </body>
 </html>
