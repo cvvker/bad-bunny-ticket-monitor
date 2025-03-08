@@ -15,13 +15,6 @@ logger = logging.getLogger(__name__)
 CHECK_INTERVAL = int(os.getenv('CHECK_INTERVAL', '15'))  # 15 seconds default
 DISCORD_WEBHOOK_URL = os.getenv('DISCORD_WEBHOOK_URL', 'https://discord.com/api/webhooks/1347702022039666783/IIgJ2B6vT5aQoTjNOadVxdAviHuEsCRR8zwu4CgWAvWzcob9BJ0_5XQC-BTyVauTljR_')
 
-# Concert dates to monitor
-CONCERT_DATES = {
-    'July': ['12', '18', '19'],
-    'August': ['1', '2', '3', '8', '9', '10', '15', '16', '17', '22', '23', '24', '29', '30', '31'],
-    'September': ['5', '6', '7', '12', '13', '14']
-}
-
 # Base URLs for different venues
 TICKETERA_URLS = {
     'July': {
@@ -54,6 +47,13 @@ TICKETERA_URLS = {
         '13': '67828df40952cb5ab00ba5dd/67828df40952cb5ab00ba636',
         '14': '67828e871104e5b3ac9ed068/67828e871104e5b3ac9ed0c1'
     }
+}
+
+# Concert dates to monitor
+CONCERT_DATES = {
+    'July': ['12', '18', '19'],
+    'August': ['1', '2', '3', '8', '9', '10', '15', '16', '17', '22', '23', '24', '29', '30', '31'],
+    'September': ['5', '6', '7', '12', '13', '14']
 }
 
 app = Flask(__name__)
@@ -138,6 +138,9 @@ def check_ticketera_availability(event_url):
             
     except requests.RequestException as e:
         logger.error(f"Error checking Ticketera: {e}")
+        return "⚡ Error checking availability"
+    except Exception as e:
+        logger.error(f"Unexpected error checking tickets: {e}")
         return "⚡ Error checking availability"
 
 def update_ticket_status():

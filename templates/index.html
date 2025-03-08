@@ -146,6 +146,17 @@
             flex-direction: column;
             gap: 10px;
         }
+        .month-section {
+            background-color: #f8f9fa;
+            padding: 10px;
+            margin: 20px 0;
+            border-radius: 5px;
+            color: #198754;
+            font-weight: bold;
+        }
+        .month-title {
+            margin-top: 0;
+        }
     </style>
 </head>
 <body>
@@ -368,10 +379,19 @@
                     };
 
                     Object.entries(data).forEach(([id, event]) => {
-                        const month = event.date.split(' ')[0];
+                        const month = event.date.split(',')[0].trim();
                         if (months[month]) {
                             months[month].push({ id, ...event });
                         }
+                    });
+
+                    // Sort events within each month by day
+                    Object.values(months).forEach(monthEvents => {
+                        monthEvents.sort((a, b) => {
+                            const dayA = parseInt(a.date.split(',')[0].split(' ')[1]);
+                            const dayB = parseInt(b.date.split(',')[0].split(' ')[1]);
+                            return dayA - dayB;
+                        });
                     });
 
                     // Check for status changes and trigger notifications
@@ -380,7 +400,6 @@
                         const currentStatus = event.status;
 
                         if (prevStatus && prevStatus !== currentStatus) {
-                            // Always notify for available tickets
                             if (currentStatus.includes('AVAILABLE')) {
                                 playAlertSound();
                                 const card = document.querySelector(`[data-event-id="${id}"]`);
@@ -388,9 +407,7 @@
                                     card.classList.add('urgent-alert');
                                     setTimeout(() => card.classList.remove('urgent-alert'), 5000);
                                 }
-                            }
-                            // Notify for unknown status that needs checking
-                            else if (currentStatus.includes('CHECK NOW')) {
+                            } else if (currentStatus.includes('CHECK NOW')) {
                                 playAlertSound();
                             }
                         }
@@ -402,17 +419,20 @@
                         return acc;
                     }, {});
 
-                    // Display events grouped by month
-                    Object.entries(months).forEach(([month, events]) => {
-                        if (events.length > 0) {
+                    // Display events in order
+                    ['July', 'August', 'September'].forEach(month => {
+                        if (months[month].length > 0) {
                             const monthDiv = document.createElement('div');
-                            monthDiv.className = 'month-divider';
-                            monthDiv.textContent = `${month} 2025`;
+                            monthDiv.className = 'month-section mb-4';
+                            monthDiv.innerHTML = `<h2 class="month-title">${month} 2025</h2>`;
                             container.appendChild(monthDiv);
 
-                            events.forEach(event => {
-                                container.appendChild(createEventCard(event.id, event));
+                            const row = document.createElement('div');
+                            row.className = 'row';
+                            months[month].forEach(event => {
+                                row.appendChild(createEventCard(event.id, event));
                             });
+                            container.appendChild(row);
                         }
                     });
 
