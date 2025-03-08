@@ -1,163 +1,184 @@
 <!DOCTYPE html>
-<html>
+<html lang="en" data-bs-theme="dark">
 <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bad Bunny Ticket Monitor</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
     <style>
-        /* Previous styles remain unchanged */
-        .ticket-card {
-            margin-bottom: 20px;
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
-            border: none;
-            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        :root {
+            --dark-bg: #121212;
+            --dark-card: #1e1e1e;
+            --dark-accent: #272727;
+            --dark-text: #e0e0e0;
+            --dark-muted: #aaaaaa;
+            --dark-primary: #bb86fc;
+            --dark-secondary: #03dac6;
+            --dark-danger: #cf6679;
+            --dark-warning: #ffb74d;
+            --dark-info: #64b5f6;
+            --dark-success: #81c784;
         }
-        .status-badge {
-            font-size: 1em;
-            padding: 8px 12px;
-            border-radius: 20px;
-            font-weight: 600;
+
+        body {
+            background-color: var(--dark-bg);
+            color: var(--dark-text);
+            transition: background-color 0.3s, color 0.3s;
         }
-        .month-divider {
-            background: #f8f9fa;
-            padding: 10px;
-            margin: 20px 0;
-            border-radius: 5px;
-            color: #198754;
+
+        .card {
+            background-color: var(--dark-card);
+            border-color: var(--dark-accent);
+            color: var(--dark-text);
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0, 0, 0, 0.3);
+        }
+
+        .card-title {
+            color: var(--dark-primary);
+        }
+
+        .navbar {
+            background-color: var(--dark-accent) !important;
+        }
+
+        .btn-primary {
+            background-color: var(--dark-primary);
+            border-color: var(--dark-primary);
+        }
+
+        .btn-primary:hover {
+            background-color: #a370e7;
+            border-color: #a370e7;
+        }
+
+        .status-alert {
+            height: 5px;
+            transition: background-color 0.5s;
+        }
+
+        .alert-success {
+            background-color: var(--dark-success) !important;
+        }
+
+        .alert-warning {
+            background-color: var(--dark-warning) !important;
+        }
+
+        .alert-danger {
+            background-color: var(--dark-danger) !important;
+        }
+
+        .alert-info {
+            background-color: var(--dark-info) !important;
+        }
+
+        .badge.alert-success {
+            background-color: var(--dark-success) !important;
+        }
+
+        .badge.alert-warning {
+            background-color: var(--dark-warning) !important;
+        }
+
+        .badge.alert-danger {
+            background-color: var(--dark-danger) !important;
+        }
+
+        .badge.alert-info {
+            background-color: var(--dark-info) !important;
+        }
+
+        .month-title {
+            color: var(--dark-secondary);
+            border-bottom: 2px solid var(--dark-secondary);
+            padding-bottom: 0.5rem;
+            margin-bottom: 1rem;
+        }
+
+        #countdown {
+            color: var(--dark-primary);
             font-weight: bold;
         }
-        /* Status Colors and Animations */
-        .badge.alert-success {
-            background-color: #28a745 !important;
-            color: white;
-            animation: pulse 2s infinite;
-        }
-        .badge.alert-warning {
-            background-color: #ffc107 !important;
-            color: #000;
-        }
-        .badge.alert-info {
-            background-color: #17a2b8 !important;
-            color: white;
-        }
-        .badge.alert-danger {
-            background-color: #dc3545 !important;
-            color: white;
-            animation: shake 0.82s cubic-bezier(.36,.07,.19,.97) both infinite;
-        }
-        .urgent-alert {
-            animation: shake 0.82s cubic-bezier(.36,.07,.19,.97) both infinite;
-            transform: translate3d(0, 0, 0);
-            background-color: #ff4444 !important;
-            border-color: #ff4444 !important;
-        }
+
         @keyframes shake {
-            10%, 90% { transform: translate3d(-1px, 0, 0); }
-            20%, 80% { transform: translate3d(2px, 0, 0); }
-            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
-            40%, 60% { transform: translate3d(4px, 0, 0); }
+            0% { transform: translate(0, 0); }
+            20% { transform: translate(-5px, 0); }
+            40% { transform: translate(5px, 0); }
+            60% { transform: translate(-5px, 0); }
+            80% { transform: translate(5px, 0); }
+            100% { transform: translate(0, 0); }
         }
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.5; }
-            100% { opacity: 1; }
+
+        .shake {
+            animation: shake 0.5s;
         }
+
+        .ticket-card {
+            overflow: hidden;
+            border-radius: 10px;
+            position: relative;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        }
+
         .status-alert {
             position: absolute;
             top: 0;
             left: 0;
-            width: 8px;
-            height: 100%;
-            transition: background-color 0.3s ease;
+            right: 0;
+            height: 5px;
+            transition: background-color 0.5s;
         }
-        .status-alert.alert-success {
-            background-color: #28a745;
-            box-shadow: 0 0 10px rgba(40, 167, 69, 0.5);
-        }
-        .status-alert.alert-warning {
-            background-color: #ffc107;
-            box-shadow: 0 0 10px rgba(255, 193, 7, 0.5);
-        }
-        .status-alert.alert-danger {
-            background-color: #dc3545;
-            box-shadow: 0 0 10px rgba(220, 53, 69, 0.5);
-        }
-        .status-alert.alert-info {
-            background-color: #17a2b8;
-            box-shadow: 0 0 10px rgba(23, 162, 184, 0.5);
-        }
-        /* Timer and Control Panel Styles */
-        .timer-container {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            background: rgba(255, 255, 255, 0.95);
-            padding: 15px;
-            border-radius: 10px;
-            box-shadow: 0 2px 15px rgba(0,0,0,0.1);
-            z-index: 1000;
-            text-align: center;
-            min-width: 200px;
-        }
-        .countdown-ring {
-            position: relative;
-            width: 60px;
-            height: 60px;
-            margin: 0 auto 10px;
-        }
-        .countdown-circle {
-            transform: rotate(-90deg);
-            transform-origin: 50% 50%;
-        }
-        .countdown-circle circle {
-            stroke-dasharray: 283;
-            stroke-dashoffset: 0;
-            fill: none;
-            stroke-width: 4;
-        }
-        .countdown-circle .progress {
-            stroke: #28a745;
-            transition: stroke-dashoffset 0.1s linear;
-        }
-        .countdown-circle .bg {
-            stroke: #e9ecef;
-        }
-        .countdown-number {
-            position: absolute;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            font-size: 1.2em;
+
+        .status-badge {
+            border-radius: 20px;
+            padding: 5px 10px;
             font-weight: bold;
-            color: #28a745;
         }
-        .next-check-time {
-            font-size: 0.9em;
-            color: #666;
-            margin-top: 5px;
+
+        .card-text {
+            color: var(--dark-muted);
+            font-size: 0.9rem;
         }
-        .notification-toggle {
+
+        .toggle-sound {
+            border-radius: 50%;
+            width: 50px;
+            height: 50px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
             position: fixed;
             bottom: 20px;
             right: 20px;
             z-index: 1000;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+            background-color: var(--dark-primary);
+            border: none;
         }
-        .month-section {
-            background-color: #f8f9fa;
-            padding: 10px;
-            margin: 20px 0;
-            border-radius: 5px;
-            color: #198754;
-            font-weight: bold;
+
+        .toggle-sound:hover {
+            background-color: #a370e7;
         }
-        .month-title {
-            margin-top: 0;
+
+        .toggle-sound i {
+            font-size: 1.5rem;
+        }
+
+        footer {
+            background-color: var(--dark-accent);
+            color: var(--dark-muted);
+            padding: 1rem 0;
+            margin-top: 2rem;
         }
     </style>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
 <body>
     <div class="container mt-5">
