@@ -656,8 +656,10 @@
                         ticketCard.classList.remove('shake');
                     }, 1000);
                     
-                    // Play sound if enabled and status changed
-                    if (isSoundEnabled()) {
+                    // Check if status has changed from unavailable to available
+                    const previousStatus = previousStates[eventId] || '';
+                    if (!previousStatus.includes('Available') && isSoundEnabled()) {
+                        console.log(`Status changed for ${eventId}: ${previousStatus} → ${event.status}`);
                         playAlertSound();
                     }
                 } else if (event.status.includes('Soon')) {
@@ -669,6 +671,9 @@
                 } else {
                     statusBadge.className = 'badge alert-info status-badge';
                 }
+                
+                // Store current status for next comparison
+                previousStates[eventId] = event.status;
                 
                 // Apply the alert class to the status alert bar
                 statusAlert.className = `status-alert ${alertClass}`;
