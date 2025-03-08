@@ -177,6 +177,29 @@
             padding: 1rem 0;
             margin-top: 2rem;
         }
+
+        /* Dark theme */
+        body {
+            background-color: #121212;
+            color: #e0e0e0;
+        }
+        
+        /* Sound related styles */
+        .sound-controls {
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        #custom-sound-container {
+            display: none;
+            margin-top: 10px;
+        }
+        
+        #custom-sound-container.visible {
+            display: block;
+        }
     </style>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
@@ -188,10 +211,32 @@
             <h4 class="alert-heading"><i class="fas fa-info-circle"></i> Monitoring Ticketera for Bad Bunny Tickets</h4>
             <p>This tool checks Ticketera for Bad Bunny ticket availability. Get notified immediately when tickets become available!</p>
             <hr>
-            <p class="mb-0">
-                <i class="fas fa-volume-up me-2"></i> Sound alerts are <span id="sound-status">ENABLED</span>.
+            <div class="sound-controls">
+                <i class="fas fa-volume-up me-2"></i> Sound alerts are <span id="sound-status">ENABLED</span>
                 <button class="btn btn-sm btn-outline-light ms-2" onclick="toggleSound()">Toggle Sound</button>
-            </p>
+                <button class="btn btn-sm btn-outline-light ms-2" onclick="toggleCustomSoundOptions()">Custom Sound</button>
+            </div>
+            
+            <div id="custom-sound-container">
+                <div class="mt-2">
+                    <label for="custom-sound-url" class="form-label">Enter URL for custom sound:</label>
+                    <input type="text" class="form-control" id="custom-sound-url" placeholder="https://example.com/sound.mp3">
+                    <small class="text-muted">Enter a direct link to an MP3 file</small>
+                </div>
+                <div class="mt-2">
+                    <label class="form-label">Or select a preset:</label>
+                    <div class="btn-group">
+                        <button class="btn btn-sm btn-outline-light" onclick="selectPresetSound('default')">Default Alert</button>
+                        <button class="btn btn-sm btn-outline-light" onclick="selectPresetSound('loud')">Loud Alarm</button>
+                        <button class="btn btn-sm btn-outline-light" onclick="selectPresetSound('soft')">Soft Notification</button>
+                    </div>
+                </div>
+                <div class="mt-2">
+                    <button class="btn btn-primary" onclick="saveCustomSound()">Save Sound Preference</button>
+                    <button class="btn btn-sm btn-outline-light ms-2" onclick="testSound()">Test Sound</button>
+                </div>
+            </div>
+            
             <p class="mt-2 mb-0">
                 <i class="fas fa-refresh me-2"></i> Server checks Ticketera every <strong>15 seconds</strong> (to avoid bot detection) | Countdown timer updates every second
             </p>
@@ -221,9 +266,9 @@
         </button>
     </div>
 
-    <audio id="alertSound" preload="auto">
+    <audio id="alertSound" style="display: none;">
+        <!-- Default alert sound - base64 encoded MP3 -->
         <source src="data:audio/mpeg;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAASAAAeMwAUFBQUFCgoKCgoKDw8PDw8PFBQUFBQUG5ubm5uboKCgoKCgpaWlpaWlqqqqqqqqr6+vr6+vtLS0tLS0ubm5ubm5vr6+vr6+v8AAAAATGF2YzU4LjEzAAAAAAAAAAAAAAAAJAQKAAAAAAAAHjOZTf9C//MsAAAAAAAAAAAAAAAAAAAA//tQZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAACzAAICAg4ODg4SEhISEhoaGhoaHh4eHh4iIiIiIiYmJiYmKioqKiouLi4uLjMzMzMzNzc3Nzc8PDw8PD4+Pj4+P8AAAAATGF2ZTU4LjEzAAAAAAAAAAAAAAAAJAQGAAAAAAAACs3yxUAAAAAAAAAAAAAAAAAAAAAA//sQZAAP8AAAaQAAAAgAAA0gAAABAAABpAAAACAAADSAAAAETEFNRTMuOTkuNVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/+xBkBY/wAABpAAAACAAADSAAAAEAAAGkAAAAIAAANIAAAARVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV" type="audio/mpeg">
-        Your browser does not support the audio element.
     </audio>
 
     <script>
@@ -304,67 +349,42 @@
         const FALLBACK_DATA = generateFallbackData();
         let cachedData = FALLBACK_DATA;  // Start with fallback data immediately
         
+        let soundEnabled = true;
+        
+        function isSoundEnabled() {
+            return soundEnabled;
+        }
+        
         function toggleSound() {
-            const soundEnabled = localStorage.getItem('soundEnabled') === 'true';
-            localStorage.setItem('soundEnabled', (!soundEnabled).toString());
-            updateSoundButton();
+            soundEnabled = !soundEnabled;
+            const soundStatus = document.getElementById('sound-status');
+            soundStatus.innerText = soundEnabled ? 'ENABLED' : 'DISABLED';
+            
+            // Save preference to localStorage
+            localStorage.setItem('soundEnabled', soundEnabled.toString());
         }
-
-        function updateSoundButton() {
-            const soundEnabled = localStorage.getItem('soundEnabled') === 'true';
-            const button = document.getElementById('soundToggle');
-            if (soundEnabled) {
-                button.innerHTML = '🔔 Sound ON';
-                button.className = 'btn btn-success';
-            } else {
-                button.innerHTML = '🔕 Sound OFF';
-                button.className = 'btn btn-secondary';
-            }
-        }
-
+        
         function playAlertSound() {
-            const soundEnabled = localStorage.getItem('soundEnabled') === 'true';
-            if (!soundEnabled) {
-                return;
-            }
-
-            const audio = document.getElementById('alertSound');
-            
-            // Reset the audio to the beginning
-            try {
-                audio.pause();
-                audio.currentTime = 0;
-            } catch (e) {
-                console.error("Error resetting audio:", e);
-            }
-            
-            // Try to play with retries
-            let attempts = 0;
-            const maxAttempts = 3;
-            
-            const attemptPlay = () => {
-                attempts++;
+            if (soundEnabled) {
+                const audioElement = document.getElementById('alertSound');
                 
-                const playPromise = audio.play();
+                // Reset the audio to the beginning
+                audioElement.currentTime = 0;
+                
+                // Play the sound with a promise to handle autoplay restrictions
+                const playPromise = audioElement.play();
                 
                 if (playPromise !== undefined) {
-                    playPromise.then(() => {
-                        console.log("Audio played successfully");
-                    }).catch(error => {
-                        console.error("Error playing audio:", error);
-                        
-                        if (error.name === "NotAllowedError") {
-                            alert("Please interact with the page to enable sound notifications");
-                        }
-                        
-                        if (attempts < maxAttempts) {
-                            setTimeout(attemptPlay, 1000);
-                        }
+                    playPromise.then(_ => {
+                        // Playback started successfully
+                        console.log("Alert sound played successfully");
+                    })
+                    .catch(error => {
+                        // Auto-play was prevented, show a UI element to let the user start playback
+                        console.error("Audio playback was prevented:", error);
                     });
                 }
-            };
-            
-            attemptPlay();
+            }
         }
 
         function testNotification() {
@@ -622,20 +642,70 @@
         
         // Initialize
         function initialize() {
-            localStorage.setItem('soundEnabled', 'true');
-            updateSoundButton();
+            // Load sound preference from localStorage
+            const savedSoundPreference = localStorage.getItem('soundEnabled');
+            if (savedSoundPreference !== null) {
+                soundEnabled = savedSoundPreference === 'true';
+                const soundStatus = document.getElementById('sound-status');
+                soundStatus.innerText = soundEnabled ? 'ENABLED' : 'DISABLED';
+            }
             
-            // Initial data fetch
+            // Load custom sound URL if saved
+            const savedSoundUrl = localStorage.getItem('customSoundUrl');
+            if (savedSoundUrl) {
+                document.getElementById('custom-sound-url').value = savedSoundUrl;
+                document.getElementById('alertSound').src = savedSoundUrl;
+            }
+            
+            // Start fetching data
             updateTicketData();
-            updateCountdown();
             
-            // Set intervals for regular updates
-            // Occasional server data fetches (15 seconds)
+            // Set interval for server data fetches (15 seconds)
             setInterval(() => updateTicketData(), SERVER_CHECK_INTERVAL);
+            
+            // Update the countdown timer every second
+            setInterval(updateCountdown, 1000);
         }
         
         // Initialize when DOM is ready
         document.addEventListener('DOMContentLoaded', initialize);
+        
+        function toggleCustomSoundOptions() {
+            const container = document.getElementById('custom-sound-container');
+            if (container.classList.contains('visible')) {
+                container.classList.remove('visible');
+            } else {
+                container.classList.add('visible');
+            }
+        }
+        
+        function selectPresetSound(preset) {
+            const audio = document.getElementById('alertSound');
+            if (preset === 'default') {
+                audio.src = 'data:audio/mpeg;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAASAAAeMwAUFBQUFCgoKCgoKDw8PDw8PFBQUFBQUG5ubm5uboKCgoKCgpaWlpaWlqqqqqqqqr6+vr6+vtLS0tLS0ubm5ubm5vr6+vr6+v8AAAAATGF2YzU4LjEzAAAAAAAAAAAAAAAAJAQKAAAAAAAAHjOZTf9C//MsAAAAAAAAAAAAAAAAAAAA//tQZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAACzAAICAg4ODg4SEhISEhoaGhoaHh4eHh4iIiIiIiYmJiYmKioqKiouLi4uLjMzMzMzNzc3Nzc8PDw8PD4+Pj4+P8AAAAATGF2ZTU4LjEzAAAAAAAAAAAAAAAAJAQGAAAAAAAACs3yxUAAAAAAAAAAAAAAAAAAAAAA//sQZAAP8AAAaQAAAAgAAA0gAAABAAABpAAAACAAADSAAAAETEFNRTMuOTkuNVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/+xBkBY/wAABpAAAACAAADSAAAAEAAAGkAAAAIAAANIAAAARVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV';
+            } else if (preset === 'loud') {
+                audio.src = 'data:audio/mpeg;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAASAAAeMwAUFBQUFCgoKCgoKDw8PDw8PFBQUFBQUG5ubm5uboKCgoKCgpaWlpaWlqqqqqqqqr6+vr6+vtLS0tLS0ubm5ubm5vr6+vr6+v8AAAAATGF2YzU4LjEzAAAAAAAAAAAAAAAAJAQKAAAAAAAAHjOZTf9C//MsAAAAAAAAAAAAAAAAAAAA//tQZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAACzAAICAg4ODg4SEhISEhoaGhoaHh4eHh4iIiIiIiYmJiYmKioqKiouLi4uLjMzMzMzNzc3Nzc8PDw8PD4+Pj4+P8AAAAATGF2ZTU4LjEzAAAAAAAAAAAAAAAAJAQGAAAAAAAACs3yxUAAAAAAAAAAAAAAAAAAAAAA//sQZAAP8AAAaQAAAAgAAA0gAAABAAABpAAAACAAADSAAAAETEFNRTMuOTkuNVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/+xBkBY/wAABpAAAACAAADSAAAAEAAAGkAAAAIAAANIAAAARVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV';
+            } else if (preset === 'soft') {
+                audio.src = 'data:audio/mpeg;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAASAAAeMwAUFBQUFCgoKCgoKDw8PDw8PFBQUFBQUG5ubm5uboKCgoKCgpaWlpaWlqqqqqqqqr6+vr6+vtLS0tLS0ubm5ubm5vr6+vr6+v8AAAAATGF2YzU4LjEzAAAAAAAAAAAAAAAAJAQKAAAAAAAAHjOZTf9C//MsAAAAAAAAAAAAAAAAAAAA//tQZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAACzAAICAg4ODg4SEhISEhoaGhoaHh4eHh4iIiIiIiYmJiYmKioqKiouLi4uLjMzMzMzNzc3Nzc8PDw8PD4+Pj4+P8AAAAATGF2ZTU4LjEzAAAAAAAAAAAAAAAAJAQGAAAAAAAACs3yxUAAAAAAAAAAAAAAAAAAAAAA//sQZAAP8AAAaQAAAAgAAA0gAAABAAABpAAAACAAADSAAAAETEFNRTMuOTkuNVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/+xBkBY/wAABpAAAACAAADSAAAAEAAAGkAAAAIAAANIAAAARVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV';
+            }
+        }
+        
+        function saveCustomSound() {
+            const url = document.getElementById('custom-sound-url').value;
+            if (url) {
+                const audio = document.getElementById('alertSound');
+                audio.src = url;
+                localStorage.setItem('customSoundUrl', url);
+                alert('Custom sound saved! Click Test Sound to make sure it works.');
+            } else {
+                alert('Please enter a valid URL for the custom sound.');
+            }
+        }
+        
+        function testSound() {
+            const audio = document.getElementById('alertSound');
+            audio.play();
+        }
     </script>
 </body>
 </html>
