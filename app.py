@@ -99,6 +99,64 @@ ticket_status = {}
 last_check = None
 last_update_time = {}  # Track when each event was last checked
 
+# Hardcoded Bad Bunny dates to ensure complete coverage
+BAD_BUNNY_DATES = {
+    'July': ['12', '18', '19'],
+    'August': ['1', '2', '3', '8', '9', '10', '15', '16', '17', '22', '23', '24', '29', '30', '31'],
+    'September': ['5', '6', '7', '12', '13', '14']
+}
+
+# Default URL mapping for each date
+TICKETERA_URLS = {
+    'July': {
+        '12': TICKETERA_BASE_URL,
+        '18': TICKETERA_BASE_URL,
+        '19': TICKETERA_BASE_URL
+    },
+    'August': {
+        '1': TICKETERA_BASE_URL,
+        '2': TICKETERA_BASE_URL,
+        '3': TICKETERA_BASE_URL,
+        '8': TICKETERA_BASE_URL,
+        '9': TICKETERA_BASE_URL,
+        '10': TICKETERA_BASE_URL,
+        '15': TICKETERA_BASE_URL,
+        '16': TICKETERA_BASE_URL,
+        '17': TICKETERA_BASE_URL,
+        '22': TICKETERA_BASE_URL,
+        '23': TICKETERA_BASE_URL,
+        '24': TICKETERA_BASE_URL,
+        '29': TICKETERA_BASE_URL,
+        '30': TICKETERA_BASE_URL,
+        '31': TICKETERA_BASE_URL
+    },
+    'September': {
+        '5': TICKETERA_BASE_URL,
+        '6': TICKETERA_BASE_URL,
+        '7': TICKETERA_BASE_URL,
+        '12': TICKETERA_BASE_URL,
+        '13': TICKETERA_BASE_URL,
+        '14': TICKETERA_BASE_URL
+    }
+}
+
+# Create initial ticket status with all dates at startup
+for month, days in BAD_BUNNY_DATES.items():
+    for day in days:
+        event_id = f"{month.lower()}-{day}"
+        date_str = f"{month} {day}, 2025"
+        event_url = TICKETERA_URLS.get(month, {}).get(day, TICKETERA_BASE_URL)
+        
+        # Initialize with default values
+        if event_id not in ticket_status:
+            ticket_status[event_id] = {
+                "name": f"Bad Bunny - {date_str}",
+                "date": date_str,
+                "status": "⚡ Not Yet Available",
+                "url": event_url,
+                "lastChecked": "Initializing..."
+            }
+
 # Initialize last_update_time variable at startup
 for month, days in CONCERT_DATES.items():
     for day in days:
@@ -447,45 +505,68 @@ def update_ticket_status():
     # Return the full status for all events (even those not checked this round)
     return ticket_status
 
+def ensure_all_dates_exist():
+    """Ensure all Bad Bunny dates exist in the ticket status"""
+    current_time = datetime.now().strftime('%H:%M:%S')
+    
+    # Populate any missing dates with default values
+    for month, days in BAD_BUNNY_DATES.items():
+        for day in days:
+            event_id = f"{month.lower()}-{day}"
+            date_str = f"{month} {day}, 2025"
+            
+            # If this date doesn't exist in our tracking, add it
+            if event_id not in ticket_status:
+                # Get URL for this event if available, otherwise use the base URL
+                event_url = TICKETERA_BASE_URL
+                if month in TICKETERA_URLS and day in TICKETERA_URLS[month]:
+                    event_url = TICKETERA_URLS[month][day]
+                
+                # Add default status for this date
+                ticket_status[event_id] = {
+                    "name": f"Bad Bunny - {date_str}",
+                    "date": date_str,
+                    "status": "⚡ Not Yet Available",
+                    "url": event_url,
+                    "lastChecked": current_time
+                }
+
 @app.route('/api/tickets')
 def get_tickets():
-    try:
-        global last_check, ticket_status
-        
-        # First, check if we have any data at all
-        if not ticket_status or len(ticket_status) == 0:
-            # Create fallback data for all dates
-            current_time = datetime.now().strftime('%I:%M:%S %p')
-            for month, days in CONCERT_DATES.items():
-                for day in days:
-                    event_id = f"{month.lower()}-{day}"
-                    date = format_date(month, day)
-                    event_url = generate_event_url(month, day)
-                    
-                    if not event_url:
-                        continue
+    """API endpoint for getting ticket status"""
+    # Make sure we have data for all dates
+    ensure_all_dates_exist()
+    
+    # First, check if we have any data at all
+    if not ticket_status or len(ticket_status) == 0:
+        # Create fallback data for all dates
+        current_time = datetime.now().strftime('%I:%M:%S %p')
+        for month, days in CONCERT_DATES.items():
+            for day in days:
+                event_id = f"{month.lower()}-{day}"
+                date = format_date(month, day)
+                event_url = generate_event_url(month, day)
+                
+                if not event_url:
+                    continue
                         
-                    ticket_status[event_id] = {
-                        'name': f"Bad Bunny - {date}",
-                        'date': date,
-                        'status': "⚡ Not Yet Available",
-                        'url': event_url,
-                        'lastChecked': current_time
-                    }
+                ticket_status[event_id] = {
+                    'name': f"Bad Bunny - {date}",
+                    'date': date,
+                    'status': "⚡ Not Yet Available",
+                    'url': event_url,
+                    'lastChecked': current_time
+                }
         
-        # Update status if it's been more than CHECK_INTERVAL seconds
-        if not last_check or (datetime.now() - last_check).total_seconds() >= CHECK_INTERVAL:
-            update_ticket_status()
+    # Update status if it's been more than CHECK_INTERVAL seconds
+    if not last_check or (datetime.now() - last_check).total_seconds() >= CHECK_INTERVAL:
+        update_ticket_status()
         
-        # If we still have no data, create fallback data
-        if not ticket_status or len(ticket_status) == 0:
-            return jsonify(generateFallbackData())
-            
-        return jsonify(ticket_status)
-    except Exception as e:
-        logger.error(f"Error in /api/tickets endpoint: {e}")
-        # Return fallback data if there's an error
+    # If we still have no data, create fallback data
+    if not ticket_status or len(ticket_status) == 0:
         return jsonify(generateFallbackData())
+            
+    return jsonify(ticket_status)
 
 def generateFallbackData():
     """Generate fallback data for all dates in case of API failure"""

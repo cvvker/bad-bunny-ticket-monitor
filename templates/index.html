@@ -200,6 +200,69 @@
     </audio>
 
     <script>
+        // On page load, immediately display all concert dates
+        document.addEventListener('DOMContentLoaded', function() {
+            // Hardcoded dates
+            const dates = {
+                'July': ['12', '18', '19'],
+                'August': ['1', '2', '3', '8', '9', '10', '15', '16', '17', '22', '23', '24', '29', '30', '31'],
+                'September': ['5', '6', '7', '12', '13', '14']
+            };
+            
+            // Initialize container
+            const container = document.getElementById('tickets-container');
+            if (!container) return;
+            container.innerHTML = '';
+            
+            // For each month
+            ['July', 'August', 'September'].forEach(month => {
+                if (dates[month] && dates[month].length > 0) {
+                    // Create month header
+                    const monthDiv = document.createElement('div');
+                    monthDiv.className = 'month-section mb-4';
+                    monthDiv.innerHTML = `<h2 class="month-title">${month} 2025</h2>`;
+                    container.appendChild(monthDiv);
+                    
+                    // Create card row
+                    const row = document.createElement('div');
+                    row.className = 'row';
+                    
+                    // Add cards for each date
+                    dates[month].forEach(day => {
+                        const id = `${month.toLowerCase()}-${day}`;
+                        const date = `${month} ${day}, 2025`;
+                        
+                        // Create card
+                        const col = document.createElement('div');
+                        col.className = 'col-md-4 mb-4';
+                        col.innerHTML = `
+                            <div class="card ticket-card" data-event-id="${id}">
+                                <div class="status-alert alert-info"></div>
+                                <div class="card-body">
+                                    <h5 class="card-title">Bad Bunny - ${date}</h5>
+                                    <div class="d-flex justify-content-between align-items-center mb-3">
+                                        <span class="badge alert-info status-badge">⚡ Loading...</span>
+                                    </div>
+                                    <p class="card-text">Last checked: Initializing...</p>
+                                    <a href="https://choli.ticketera.com/" class="btn btn-primary" target="_blank">Check Tickets</a>
+                                </div>
+                            </div>
+                        `;
+                        row.appendChild(col);
+                    });
+                    
+                    container.appendChild(row);
+                }
+            });
+            
+            // Start the regular update cycles
+            setTimeout(function() {
+                initialize();
+            }, 1000);
+        });
+    </script>
+
+    <script>
         const SERVER_CHECK_INTERVAL = 60000; // 60 seconds in milliseconds
         const UI_UPDATE_INTERVAL = 15000;    // UI updates every 15 seconds
         
