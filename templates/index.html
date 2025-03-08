@@ -218,14 +218,8 @@
             </div>
             
             <div id="custom-sound-container">
-                <div class="mt-2">
-                    <label for="custom-sound-url" class="form-label">Enter URL for custom sound:</label>
-                    <input type="text" class="form-control" id="custom-sound-url" placeholder="https://example.com/sound.mp3">
-                    <small class="text-muted">Enter a direct link to an MP3 file</small>
-                </div>
-                
                 <div class="mt-3">
-                    <label for="sound-file-upload" class="form-label">Or upload your own sound file:</label>
+                    <label for="sound-file-upload" class="form-label">Upload your own sound file:</label>
                     <input type="file" class="form-control" id="sound-file-upload" accept="audio/*">
                     <small class="text-muted">Select an audio file from your computer</small>
                 </div>
@@ -275,7 +269,7 @@
 
     <audio id="alertSound" preload="auto" style="display: none;">
         <!-- Default alert sound - base64 encoded MP3 -->
-        <source src="data:audio/mpeg;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAASAAAeMwAUFBQUFCgoKCgoKDw8PDw8PFBQUFBQUG5ubm5uboKCgoKCgpaWlpaWlqqqqqqqqr6+vr6+vtLS0tLS0ubm5ubm5vr6+vr6+v8AAAAATGF2YzU4LjEzAAAAAAAAAAAAAAAAJAQKAAAAAAAAHjOZTf9C//MsAAAAAAAAAAAAAAAAAAAA//tQZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAACzAAICAg4ODg4SEhISEhoaGhoaHh4eHh4iIiIiIiYmJiYmKioqKiouLi4uLjMzMzMzNzc3Nzc8PDw8PD4+Pj4+P8AAAAATGF2ZTU4LjEzAAAAAAAAAAAAAAAAJAQGAAAAAAAACs3yxUAAAAAAAAAAAAAAAAAAAAAA//sQZAAP8AAAaQAAAAgAAA0gAAABAAABpAAAACAAADSAAAAETEFNRTMuOTkuNVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/+xBkBY/wAABpAAAACAAADSAAAAEAAAGkAAAAIAAANIAAAARVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV" type="audio/mpeg">
+        <source src="data:audio/mpeg;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAASAAAeMwAUFBQUFCgoKCgoKDw8PDw8PFBQUFBQUG5ubm5uboKCgoKCgpaWlpaWlqqqqqqqqr6+vr6+vtLS0tLS0ubm5ubm5vr6+vr6+v8AAAAATGF2YzU4LjEzAAAAAAAAAAAAAAAAJAQKAAAAAAAAHjOZTf9C//MsAAAAAAAAAAAAAAAAAAAA//tQZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAACzAAICAg4ODg4SEhISEhoaGhoaHh4eHh4iIiIiIiYmJiYmKioqKiouLi4uLjMzMzMzNzc3Nzc8PDw8PD4+Pj4+P8AAAAATGF2ZTU4LjEzAAAAAAAAAAAAAAAAJAQGAAAAAAAACs3yxUAAAAAAAAAAAAAAAAAAAAAA//sQZAAP8AAAaQAAAAgAAA0gAAABAAABpAAAACAAADSAAAAETEFNRTMuOTkuNVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/+xBkBY/wAABpAAAACAAADSAAAAEAAAGkAAAAIAAANIAAAARVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV">
         Your browser does not support the audio element.
     </audio>
 
@@ -670,19 +664,13 @@
                 soundStatus.innerText = soundEnabled ? 'ENABLED' : 'DISABLED';
             }
             
-            // Load custom sound URL or data if saved
-            const savedSoundUrl = localStorage.getItem('customSoundUrl');
+            // Load custom sound data if saved
             const savedSoundData = localStorage.getItem('customSoundData');
             
             if (savedSoundData) {
                 // We have a local file saved as data URL
                 document.getElementById('alertSound').src = savedSoundData;
                 console.log("Loaded custom sound from local file");
-            } else if (savedSoundUrl && savedSoundUrl !== 'LOCAL_FILE') {
-                // We have a URL saved
-                document.getElementById('custom-sound-url').value = savedSoundUrl;
-                document.getElementById('alertSound').src = savedSoundUrl;
-                console.log("Loaded custom sound from URL");
             }
             
             // Start fetching data
@@ -734,23 +722,11 @@
                         alert('Custom sound file saved! Click Test Sound to make sure it works.');
                     };
                     reader.readAsDataURL(file);
-                    return;
                 } else {
                     alert('Please select a valid audio file.');
-                    return;
                 }
-            }
-            
-            // If no file, check for URL
-            const url = document.getElementById('custom-sound-url').value;
-            if (url) {
-                const audio = document.getElementById('alertSound');
-                audio.src = url;
-                localStorage.setItem('customSoundUrl', url);
-                localStorage.removeItem('customSoundData'); // Clear any previous data URL
-                alert('Custom sound URL saved! Click Test Sound to make sure it works.');
-            } else if (!fileInput.files || !fileInput.files[0]) {
-                alert('Please enter a valid URL or select a file for the custom sound.');
+            } else {
+                alert('Please select a sound file to upload or choose a preset.');
             }
         }
         
