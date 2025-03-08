@@ -458,176 +458,207 @@
             return col;
         }
 
-        // Generates fallback data for all dates
-        function generateFallbackData() {
-            const fallbackData = {};
-            
-            Object.entries(CONCERT_DATES).forEach(([month, days]) => {
-                days.forEach(day => {
-                    const id = `${month.toLowerCase()}-${day}`;
-                    const date = `${month} ${day}, 2025`;
-                    fallbackData[id] = {
-                        name: `Bad Bunny - ${date}`,
-                        date: date,
-                        status: "⚡ Not Yet Available",
-                        url: `https://choli.ticketera.com/`,
-                        lastChecked: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })
-                    };
-                });
-            });
-            
-            return fallbackData;
-        }
-
-        function updateDisplay(forceFetch = false) {
-            // When not forcing a fetch, use the cached data and just update the UI
-            if (!forceFetch && cachedData) {
-                processTicketData(cachedData);
-                return;
-            }
-            
-            // Only fetch from the server periodically to avoid triggering anti-bot measures
+        function updateTicketData() {
             fetch('/api/tickets')
                 .then(response => response.json())
                 .then(data => {
-                    // Cache successful responses
-                    if (data && Object.keys(data).length > 0 && !data.error) {
+                    if (data && Object.keys(data).length > 0) {
+                        // Add missing dates if any are missing from the API response
+                        for (const month in CONCERT_DATES) {
+                            for (const day of CONCERT_DATES[month]) {
+                                const eventId = `${month.toLowerCase()}-${day}`;
+                                if (!data[eventId]) {
+                                    // Create a fallback entry for this date
+                                    data[eventId] = generateFallbackEntryForDate(month, day);
+                                }
+                            }
+                        }
                         cachedData = data;
-                        lastCheckTime = new Date();
+                        updateTicketUI(data);
+                    } else {
+                        // If no data from server, use cached data or generate fallback
+                        const dataToUse = cachedData || generateFallbackData();
+                        updateTicketUI(dataToUse);
                     }
-                    
-                    // Handle the API response or use fallback data
-                    processTicketData(data);
                 })
                 .catch(error => {
-                    // On API error, use cached or fallback data
-                    console.error('Error fetching tickets:', error);
+                    console.error('Error fetching ticket data:', error);
+                    // On error, use cached data or generate fallback
                     const dataToUse = cachedData || generateFallbackData();
-                    processTicketData(dataToUse);
+                    updateTicketUI(dataToUse);
                 });
         }
 
-        function processTicketData(data) {
+        function generateFallbackEntryForDate(month, day) {
+            const date = `${month} ${day}, 2025`;
+            return {
+                name: `Bad Bunny - ${date}`,
+                date: date,
+                status: "⚡ Loading...",
+                lastChecked: "Checking...",
+                url: getUrlForDate(month, day)
+            };
+        }
+
+        function getUrlForDate(month, day) {
+            // Hardcoded URLs for each date
+            const urls = {
+                'July': {
+                    '12': "https://choli.ticketera.com/checkout/67801ac67b15db4542eeed7e?underShop=67801ac67b15db4542eeee56&boxOnly=true",
+                    '18': "https://choli.ticketera.com/checkout/67801c6485e7610f9b45cb54?underShop=67801c6585e7610f9b45cbce&boxOnly=true",
+                    '19': "https://choli.ticketera.com/event/67801ccc52c0091cff4e33a7/67801ccd52c0091cff4e33f7"
+                },
+                'August': {
+                    '1': "https://choli.ticketera.com/checkout/677ff055a1198f5724fc1158?underShop=677ff055a1198f5724fc11a8",
+                    '2': "https://choli.ticketera.com/checkout/678276b19c10a4675dcd677b?underShop=678276b19c10a4675dcd67d4",
+                    '3': "https://choli.ticketera.com/checkout/6782776b39978af92af5d38e?underShop=6782776c39978af92af5d3e7",
+                    '8': "https://choli.ticketera.com/checkout/678278919c8c608b8c0ebdd2?underShop=678278929c8c608b8c0ebe2b",
+                    '9': "https://choli.ticketera.com/checkout/6782790885a03cd75926079c?underShop=6782790885a03cd759260898",
+                    '10': "https://choli.ticketera.com/checkout/67827a23406d3f4b30602cf9?underShop=67827a23406d3f4b30602d52",
+                    '15': "https://choli.ticketera.com/checkout/67827aecbb4a8ef99dab15e8?underShop=67827aecbb4a8ef99dab1641",
+                    '16': "https://choli.ticketera.com/checkout/67827b7b0cc574c721710a65?underShop=67827b7c0cc574c721710abe",
+                    '17': "https://choli.ticketera.com/checkout/67827c0f96690559d725b430?underShop=67827c1096690559d725b489",
+                    '22': "https://choli.ticketera.com/checkout/67827cf5564ad8f63c77f57d?underShop=67827cf5564ad8f63c77f5d8",
+                    '23': "https://choli.ticketera.com/checkout/67827da9651f8bdbe0bd3f0e?underShop=67827daa651f8bdbe0bd3f67",
+                    '24': "https://choli.ticketera.com/checkout/67827f39c3c7b7d600ca906a?underShop=67827f3ac3c7b7d600ca90ce",
+                    '29': "https://choli.ticketera.com/checkout/67827fce1104e5b3ac99c82a?underShop=67827fce1104e5b3ac99c883",
+                    '30': "https://choli.ticketera.com/checkout/678281fdc311c1c0762df8d6?underShop=678281fec311c1c0762df93d",
+                    '31': "https://choli.ticketera.com/checkout/6782827df1edcc48da3866fb?underShop=6782827ef1edcc48da386754"
+                },
+                'September': {
+                    '5': "https://choli.ticketera.com/checkout/678285d0a9936d5291154f60?underShop=678285d1a9936d5291154fb9",
+                    '6': "https://choli.ticketera.com/checkout/67828834bb4a8ef99daf35b9?underShop=67828835bb4a8ef99daf361c",
+                    '7': "https://choli.ticketera.com/checkout/67828abbf9dde02e3c3f059d?underShop=67828abcf9dde02e3c3f062d",
+                    '12': "https://choli.ticketera.com/checkout/67828d8333f81d3543d0a47c?underShop=67828d8333f81d3543d0a575",
+                    '13': "https://choli.ticketera.com/checkout/67828df40952cb5ab00ba5dd?underShop=67828df40952cb5ab00ba636",
+                    '14': "https://choli.ticketera.com/checkout/67828e871104e5b3ac9ed068?underShop=67828e871104e5b3ac9ed0c1"
+                }
+            };
+            
+            return urls[month]?.[day] || "https://choli.ticketera.com/";
+        }
+
+        // Generates fallback data for all dates
+        function generateFallbackData() {
+            const fallbackData = {};
+            for (const month in CONCERT_DATES) {
+                for (const day of CONCERT_DATES[month]) {
+                    const eventId = `${month.toLowerCase()}-${day}`;
+                    fallbackData[eventId] = generateFallbackEntryForDate(month, day);
+                }
+            }
+            return fallbackData;
+        }
+
+        function updateTicketUI(data) {
             const container = document.getElementById('tickets-container');
             if (!container) return;
             
-            container.innerHTML = '';
-
-            // If data is empty or has errors, use cached or fallback data
-            if (!data || Object.keys(data).length === 0 || data.error) {
-                data = cachedData || generateFallbackData();
-            }
-
-            // Group events by month
-            const months = {
-                'July': [],
-                'August': [],
-                'September': []
-            };
-
-            // Process and categorize the data
-            Object.entries(data).forEach(([id, event]) => {
-                const month = event.date ? event.date.split(',')[0].trim() : null;
-                if (month && months[month]) {
-                    months[month].push({ id, ...event });
-                }
-            });
-
-            // Add any missing dates that should be displayed
-            Object.entries(CONCERT_DATES).forEach(([month, days]) => {
-                days.forEach(day => {
-                    const id = `${month.toLowerCase()}-${day}`;
-                    // If this date is not in our data, add it with default values
-                    if (!data[id]) {
-                        const date = `${month} ${day}, 2025`;
-                        const event = {
-                            name: `Bad Bunny - ${date}`,
-                            date: date,
-                            status: "⚡ Not Yet Available",
-                            url: `https://choli.ticketera.com/`,
-                            lastChecked: "Pending..."
-                        };
-                        months[month].push({ id, ...event });
-                    }
-                });
-            });
-
-            // Sort events within each month by day
-            Object.values(months).forEach(monthEvents => {
-                monthEvents.sort((a, b) => {
-                    if (!a.date || !b.date) return 0;
-                    const dayA = parseInt(a.date.split(',')[0].split(' ')[1]);
-                    const dayB = parseInt(b.date.split(',')[0].split(' ')[1]);
-                    return dayA - dayB;
-                });
-            });
-
-            // Check for status changes and trigger notifications
-            Object.entries(data).forEach(([id, event]) => {
-                const prevStatus = previousStates[id]?.status;
-                const currentStatus = event.status;
-
-                if (prevStatus && prevStatus !== currentStatus) {
-                    // Double notification for high-priority alerts
-                    if (currentStatus && (currentStatus.includes('AVAILABLE') || currentStatus.includes('CHECK NOW'))) {
-                        // First notification
-                        playAlertSound();
-                        
-                        // Card animation
-                        const card = document.querySelector(`[data-event-id="${id}"]`);
-                        if (card) {
-                            card.classList.add('urgent-alert');
-                            setTimeout(() => card.classList.remove('urgent-alert'), 5000);
-                        }
-                        
-                        // Second notification after a delay
-                        setTimeout(playAlertSound, 3000);
-                    } else if (currentStatus && (currentStatus.includes('Queue') || currentStatus.includes('Waitlist'))) {
-                        // Single notification for less urgent status
-                        playAlertSound();
-                    }
-                }
-            });
-
-            // Update previous states
-            previousStates = Object.entries(data).reduce((acc, [id, event]) => {
-                acc[id] = { status: event.status };
-                return acc;
-            }, {});
-
-            // Display events in order
+            // First, ensure we have a section for each month
+            let monthSections = {};
             ['July', 'August', 'September'].forEach(month => {
-                if (months[month] && months[month].length > 0) {
-                    const monthDiv = document.createElement('div');
-                    monthDiv.className = 'month-section mb-4';
-                    monthDiv.innerHTML = `<h2 class="month-title">${month} 2025</h2>`;
-                    container.appendChild(monthDiv);
-
-                    const row = document.createElement('div');
-                    row.className = 'row';
-                    months[month].forEach(event => {
-                        row.appendChild(createEventCard(event.id, event));
-                    });
-                    container.appendChild(row);
+                let monthSection = document.querySelector(`.month-section[data-month="${month}"]`);
+                if (!monthSection) {
+                    monthSection = document.createElement('div');
+                    monthSection.className = 'month-section mb-4';
+                    monthSection.setAttribute('data-month', month);
+                    monthSection.innerHTML = `<h2 class="month-title">${month} 2025</h2><div class="row" data-month-row="${month}"></div>`;
+                    container.appendChild(monthSection);
                 }
+                monthSections[month] = monthSection.querySelector(`[data-month-row="${month}"]`);
             });
+            
+            // Then update or create tickets for each event
+            for (const eventId in data) {
+                const event = data[eventId];
+                const [monthLower, day] = eventId.split('-');
+                const month = monthLower.charAt(0).toUpperCase() + monthLower.slice(1);
+                
+                if (!CONCERT_DATES[month] || !CONCERT_DATES[month].includes(day)) {
+                    continue; // Skip if not in our list of concert dates
+                }
+                
+                let ticketCard = document.querySelector(`.ticket-card[data-event-id="${eventId}"]`);
+                if (!ticketCard) {
+                    // Create new card if it doesn't exist
+                    const col = document.createElement('div');
+                    col.className = 'col-md-4 mb-4';
+                    col.innerHTML = `
+                        <div class="card ticket-card" data-event-id="${eventId}">
+                            <div class="status-alert alert-info"></div>
+                            <div class="card-body">
+                                <h5 class="card-title">${event.name}</h5>
+                                <div class="d-flex justify-content-between align-items-center mb-3">
+                                    <span class="badge alert-info status-badge">${event.status}</span>
+                                </div>
+                                <p class="card-text">Last checked: ${event.lastChecked}</p>
+                                <a href="${event.url}" class="btn btn-primary" target="_blank">Check Tickets</a>
+                            </div>
+                        </div>
+                    `;
+                    monthSections[month].appendChild(col);
+                    ticketCard = col.querySelector('.ticket-card');
+                } else {
+                    // Update existing card
+                    const statusBadge = ticketCard.querySelector('.status-badge');
+                    const statusAlert = ticketCard.querySelector('.status-alert');
+                    const lastChecked = ticketCard.querySelector('.card-text');
+                    const ticketLink = ticketCard.querySelector('.btn-primary');
+                    
+                    // Check for changes
+                    const oldStatus = statusBadge.innerText;
+                    const newStatus = event.status;
+                    
+                    // Update UI elements
+                    statusBadge.innerText = newStatus;
+                    lastChecked.innerText = `Last checked: ${event.lastChecked}`;
+                    ticketLink.href = event.url;
+                    
+                    // Apply status alert coloring
+                    let alertClass = 'alert-info';
+                    if (newStatus.includes('Available')) {
+                        alertClass = 'alert-success';
+                        statusBadge.className = 'badge alert-success status-badge';
+                        ticketCard.classList.add('shake');
+                        setTimeout(() => {
+                            ticketCard.classList.remove('shake');
+                        }, 1000);
+                        
+                        // Play sound if enabled and status changed
+                        if (oldStatus !== newStatus && isSoundEnabled()) {
+                            playAlertSound();
+                        }
+                    } else if (newStatus.includes('Soon')) {
+                        alertClass = 'alert-warning';
+                        statusBadge.className = 'badge alert-warning status-badge';
+                    } else if (newStatus.includes('Sold Out')) {
+                        alertClass = 'alert-danger';
+                        statusBadge.className = 'badge alert-danger status-badge';
+                    } else {
+                        statusBadge.className = 'badge alert-info status-badge';
+                    }
+                    
+                    // Apply the alert class to the status alert bar
+                    statusAlert.className = `status-alert ${alertClass}`;
+                }
+            }
         }
-
+        
         // Initialize
         function initialize() {
             localStorage.setItem('soundEnabled', 'true');
             updateSoundButton();
             
             // Initial data fetch
-            updateDisplay(true);
+            updateTicketData();
             updateCountdown();
             
             // Set intervals for regular updates
             // Frequent UI updates from cached data (15 seconds)
-            setInterval(() => updateDisplay(false), UI_UPDATE_INTERVAL);
+            setInterval(() => updateTicketData(), UI_UPDATE_INTERVAL);
             
             // Occasional server data fetches (60 seconds)
-            setInterval(() => updateDisplay(true), SERVER_CHECK_INTERVAL);
+            setInterval(() => updateTicketData(), SERVER_CHECK_INTERVAL);
         }
         
         // Initialize when DOM is ready

@@ -43,37 +43,37 @@ for month, days in BAD_BUNNY_DATES.items():
 # Base Ticketera URL
 TICKETERA_BASE_URL = "https://choli.ticketera.com/"
 
-# Base URLs for different venues
+# Specific URLs for each Bad Bunny concert date
 TICKETERA_URLS = {
     'July': {
-        '12': 'https://choli.ticketera.com/checkout/67801ac67b15db4542eeed7e?underShop=67801ac67b15db4542eeee56&boxOnly=true',
-        '18': 'https://choli.ticketera.com/checkout/67801c6485e7610f9b45cb54?underShop=67801c6585e7610f9b45cbce&boxOnly=true',
-        '19': 'https://choli.ticketera.com/event/67801ccc52c0091cff4e33a7/67801ccd52c0091cff4e33f7'
+        '12': "https://choli.ticketera.com/checkout/67801ac67b15db4542eeed7e?underShop=67801ac67b15db4542eeee56&boxOnly=true",
+        '18': "https://choli.ticketera.com/checkout/67801c6485e7610f9b45cb54?underShop=67801c6585e7610f9b45cbce&boxOnly=true",
+        '19': "https://choli.ticketera.com/event/67801ccc52c0091cff4e33a7/67801ccd52c0091cff4e33f7"
     },
     'August': {
-        '1': 'https://choli.ticketera.com/checkout/677ff055a1198f5724fc1158?underShop=677ff055a1198f5724fc11a8',
-        '2': 'https://choli.ticketera.com/checkout/678276b19c10a4675dcd677b?underShop=678276b19c10a4675dcd67d4',
-        '3': 'https://choli.ticketera.com/checkout/6782776b39978af92af5d38e?underShop=6782776c39978af92af5d3e7',
-        '8': 'https://choli.ticketera.com/checkout/678278919c8c608b8c0ebdd2?underShop=678278929c8c608b8c0ebe2b',
-        '9': 'https://choli.ticketera.com/checkout/6782790885a03cd75926079c?underShop=6782790885a03cd759260898',
-        '10': 'https://choli.ticketera.com/checkout/67827a23406d3f4b30602cf9?underShop=67827a23406d3f4b30602d52',
-        '15': 'https://choli.ticketera.com/checkout/67827aecbb4a8ef99dab15e8?underShop=67827aecbb4a8ef99dab1641',
-        '16': 'https://choli.ticketera.com/checkout/67827b7b0cc574c721710a65?underShop=67827b7c0cc574c721710abe',
-        '17': 'https://choli.ticketera.com/checkout/67827c0f96690559d725b430?underShop=67827c1096690559d725b489',
-        '22': 'https://choli.ticketera.com/checkout/67827cf5564ad8f63c77f57d?underShop=67827cf5564ad8f63c77f5d8',
-        '23': 'https://choli.ticketera.com/checkout/67827da9651f8bdbe0bd3f0e?underShop=67827daa651f8bdbe0bd3f67',
-        '24': 'https://choli.ticketera.com/checkout/67827f39c3c7b7d600ca906a?underShop=67827f3ac3c7b7d600ca90ce',
-        '29': 'https://choli.ticketera.com/checkout/67827fce1104e5b3ac99c82a?underShop=67827fce1104e5b3ac99c883',
-        '30': 'https://choli.ticketera.com/checkout/678281fdc311c1c0762df8d6?underShop=678281fec311c1c0762df93d',
-        '31': 'https://choli.ticketera.com/checkout/6782827df1edcc48da3866fb?underShop=6782827ef1edcc48da386754'
+        '1': "https://choli.ticketera.com/checkout/677ff055a1198f5724fc1158?underShop=677ff055a1198f5724fc11a8",
+        '2': "https://choli.ticketera.com/checkout/678276b19c10a4675dcd677b?underShop=678276b19c10a4675dcd67d4",
+        '3': "https://choli.ticketera.com/checkout/6782776b39978af92af5d38e?underShop=6782776c39978af92af5d3e7",
+        '8': "https://choli.ticketera.com/checkout/678278919c8c608b8c0ebdd2?underShop=678278929c8c608b8c0ebe2b",
+        '9': "https://choli.ticketera.com/checkout/6782790885a03cd75926079c?underShop=6782790885a03cd759260898",
+        '10': "https://choli.ticketera.com/checkout/67827a23406d3f4b30602cf9?underShop=67827a23406d3f4b30602d52",
+        '15': "https://choli.ticketera.com/checkout/67827aecbb4a8ef99dab15e8?underShop=67827aecbb4a8ef99dab1641",
+        '16': "https://choli.ticketera.com/checkout/67827b7b0cc574c721710a65?underShop=67827b7c0cc574c721710abe",
+        '17': "https://choli.ticketera.com/checkout/67827c0f96690559d725b430?underShop=67827c1096690559d725b489",
+        '22': "https://choli.ticketera.com/checkout/67827cf5564ad8f63c77f57d?underShop=67827cf5564ad8f63c77f5d8",
+        '23': "https://choli.ticketera.com/checkout/67827da9651f8bdbe0bd3f0e?underShop=67827daa651f8bdbe0bd3f67",
+        '24': "https://choli.ticketera.com/checkout/67827f39c3c7b7d600ca906a?underShop=67827f3ac3c7b7d600ca90ce",
+        '29': "https://choli.ticketera.com/checkout/67827fce1104e5b3ac99c82a?underShop=67827fce1104e5b3ac99c883",
+        '30': "https://choli.ticketera.com/checkout/678281fdc311c1c0762df8d6?underShop=678281fec311c1c0762df93d",
+        '31': "https://choli.ticketera.com/checkout/6782827df1edcc48da3866fb?underShop=6782827ef1edcc48da386754"
     },
     'September': {
-        '5': 'https://choli.ticketera.com/checkout/678285d0a9936d5291154f60?underShop=678285d1a9936d5291154fb9',
-        '6': 'https://choli.ticketera.com/checkout/67828834bb4a8ef99daf35b9?underShop=67828835bb4a8ef99daf361c',
-        '7': 'https://choli.ticketera.com/checkout/67828abbf9dde02e3c3f059d?underShop=67828abcf9dde02e3c3f062d',
-        '12': 'https://choli.ticketera.com/checkout/67828d8333f81d3543d0a47c?underShop=67828d8333f81d3543d0a575',
-        '13': 'https://choli.ticketera.com/checkout/67828df40952cb5ab00ba5dd?underShop=67828df40952cb5ab00ba636',
-        '14': 'https://choli.ticketera.com/checkout/67828e871104e5b3ac9ed068?underShop=67828e871104e5b3ac9ed0c1'
+        '5': "https://choli.ticketera.com/checkout/678285d0a9936d5291154f60?underShop=678285d1a9936d5291154fb9",
+        '6': "https://choli.ticketera.com/checkout/67828834bb4a8ef99daf35b9?underShop=67828835bb4a8ef99daf361c",
+        '7': "https://choli.ticketera.com/checkout/67828abbf9dde02e3c3f059d?underShop=67828abcf9dde02e3c3f062d",
+        '12': "https://choli.ticketera.com/checkout/67828d8333f81d3543d0a47c?underShop=67828d8333f81d3543d0a575",
+        '13': "https://choli.ticketera.com/checkout/67828df40952cb5ab00ba5dd?underShop=67828df40952cb5ab00ba636",
+        '14': "https://choli.ticketera.com/checkout/67828e871104e5b3ac9ed068?underShop=67828e871104e5b3ac9ed0c1"
     }
 }
 
@@ -107,7 +107,7 @@ BAD_BUNNY_DATES = {
 }
 
 # Default URL mapping for each date
-TICKETERA_URLS = {
+TICKETERA_URLS_DEFAULT = {
     'July': {
         '12': TICKETERA_BASE_URL,
         '18': TICKETERA_BASE_URL,
@@ -145,7 +145,7 @@ for month, days in BAD_BUNNY_DATES.items():
     for day in days:
         event_id = f"{month.lower()}-{day}"
         date_str = f"{month} {day}, 2025"
-        event_url = TICKETERA_URLS.get(month, {}).get(day, TICKETERA_BASE_URL)
+        event_url = TICKETERA_URLS.get(month, {}).get(day, TICKETERA_URLS_DEFAULT[month][day])
         
         # Initialize with default values
         if event_id not in ticket_status:
