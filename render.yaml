@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: bad-bunny-ticket-monitor
+    env: python
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.11.2
