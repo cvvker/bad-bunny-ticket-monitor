@@ -1,4 +1,12 @@
-bind = "0.0.0.0:10000"
-workers = 1
-threads = 4
-timeout = 120
+bind = "0.0.0.0:$PORT"  # Use Render's PORT environment variable
+workers = 4  # Increased for better concurrency
+threads = 4  # Keep thread count for async operations
+timeout = 120  # Long timeout for ticket checking
+worker_class = 'gthread'  # Thread-based workers for better async handling
+max_requests = 1000
+max_requests_jitter = 50
+preload_app = True
+forwarded_allow_ips = '*'  # Required for Render's proxy setup
+accesslog = '-'  # Log to stdout for Render logging
+errorlog = '-'  # Log errors to stdout for Render logging
+loglevel = 'info'

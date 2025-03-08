@@ -3,7 +3,23 @@ services:
     name: bad-bunny-ticket-monitor
     env: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app
+    startCommand: gunicorn -c gunicorn_config.py app:app
     envVars:
       - key: PYTHON_VERSION
         value: 3.11.2
+      - key: CHECK_INTERVAL
+        value: "15"  # 15 seconds between checks
+      - key: DISCORD_WEBHOOK_URL
+        value: "https://discord.com/api/webhooks/1347702022039666783/IIgJ2B6vT5aQoTjNOadVxdAviHuEsCRR8zwu4CgWAvWzcob9BJ0_5XQC-BTyVauTljR_"
+    plan: starter
+    healthCheckPath: /
+    autoDeploy: true
+    scaling:
+      minInstances: 1
+      maxInstances: 1
+    domains:
+      - name: bad-bunny-monitor
+    headers:
+      - path: /*
+        name: X-Frame-Options
+        value: DENY

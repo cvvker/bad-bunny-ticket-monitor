@@ -4,6 +4,7 @@
     <title>Bad Bunny Ticket Monitor</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/css/bootstrap.min.css" rel="stylesheet">
     <style>
+        /* Previous styles remain unchanged */
         .ticket-card {
             margin-bottom: 20px;
             transition: all 0.3s ease;
@@ -12,17 +13,21 @@
             border: none;
             box-shadow: 0 4px 6px rgba(0,0,0,0.1);
         }
-        .ticket-card:hover {
-            transform: translateY(-5px);
-            box-shadow: 0 6px 12px rgba(0,0,0,0.15);
-        }
         .status-badge {
             font-size: 1em;
             padding: 8px 12px;
             border-radius: 20px;
             font-weight: 600;
-            letter-spacing: 0.5px;
         }
+        .month-divider {
+            background: #f8f9fa;
+            padding: 10px;
+            margin: 20px 0;
+            border-radius: 5px;
+            color: #198754;
+            font-weight: bold;
+        }
+        /* Status Colors and Animations */
         .badge.alert-success {
             background-color: #28a745 !important;
             color: white;
@@ -31,7 +36,6 @@
         .badge.alert-warning {
             background-color: #ffc107 !important;
             color: #000;
-            animation: pulse 2s infinite;
         }
         .badge.alert-info {
             background-color: #17a2b8 !important;
@@ -41,6 +45,23 @@
             background-color: #dc3545 !important;
             color: white;
             animation: shake 0.82s cubic-bezier(.36,.07,.19,.97) both infinite;
+        }
+        .urgent-alert {
+            animation: shake 0.82s cubic-bezier(.36,.07,.19,.97) both infinite;
+            transform: translate3d(0, 0, 0);
+            background-color: #ff4444 !important;
+            border-color: #ff4444 !important;
+        }
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-1px, 0, 0); }
+            20%, 80% { transform: translate3d(2px, 0, 0); }
+            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
+            40%, 60% { transform: translate3d(4px, 0, 0); }
+        }
+        @keyframes pulse {
+            0% { opacity: 1; }
+            50% { opacity: 0.5; }
+            100% { opacity: 1; }
         }
         .status-alert {
             position: absolute;
@@ -66,77 +87,7 @@
             background-color: #17a2b8;
             box-shadow: 0 0 10px rgba(23, 162, 184, 0.5);
         }
-        .last-checked {
-            font-size: 0.8em;
-            color: #666;
-        }
-        .concert-date {
-            font-weight: bold;
-            color: #dc3545;
-        }
-        .main-event {
-            border-left: 4px solid #198754;
-        }
-        .month-divider {
-            background: #f8f9fa;
-            padding: 10px;
-            margin: 20px 0;
-            border-radius: 5px;
-            color: #198754;
-            font-weight: bold;
-        }
-        .notification-toggle {
-            position: fixed;
-            bottom: 20px;
-            right: 20px;
-            z-index: 1000;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-        .urgent-alert {
-            animation: shake 0.82s cubic-bezier(.36,.07,.19,.97) both infinite;
-            transform: translate3d(0, 0, 0);
-            backface-visibility: hidden;
-            perspective: 1000px;
-            background-color: #ff4444 !important;
-            border-color: #ff4444 !important;
-        }
-        @keyframes shake {
-            10%, 90% { transform: translate3d(-1px, 0, 0); }
-            20%, 80% { transform: translate3d(2px, 0, 0); }
-            30%, 50%, 70% { transform: translate3d(-4px, 0, 0); }
-            40%, 60% { transform: translate3d(4px, 0, 0); }
-        }
-        .check-countdown {
-            font-size: 0.8em;
-            color: #666;
-            margin-top: 5px;
-        }
-        .next-check {
-            font-size: 0.9em;
-            color: #198754;
-            margin-left: 10px;
-        }
-        .control-panel {
-            background: rgba(255, 255, 255, 0.9);
-            padding: 15px;
-            border-radius: 10px;
-            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-        }
-        @keyframes pulse {
-            0% { opacity: 1; }
-            50% { opacity: 0.5; }
-            100% { opacity: 1; }
-        }
-        .status-change {
-            animation: highlight 2s ease-in-out;
-        }
-        @keyframes highlight {
-            0% { background-color: rgba(255, 193, 7, 0.3); }
-            50% { background-color: rgba(255, 193, 7, 0.1); }
-            100% { background-color: transparent; }
-        }
+        /* Timer and Control Panel Styles */
         .timer-container {
             position: fixed;
             top: 20px;
@@ -186,6 +137,15 @@
             color: #666;
             margin-top: 5px;
         }
+        .notification-toggle {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            z-index: 1000;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
     </style>
 </head>
 <body>
@@ -210,214 +170,270 @@
                 <small>Auto-refreshing every 15 seconds</small>
             </div>
         </div>
-        <div id="mainEventContainer"></div>
-        <div id="julyContainer">
-            <div class="month-divider">July 2025</div>
-            <div class="row" id="julyEvents"></div>
-        </div>
-        <div id="augustContainer">
-            <div class="month-divider">August 2025</div>
-            <div class="row" id="augustEvents"></div>
-        </div>
-        <div id="septemberContainer">
-            <div class="month-divider">September 2025</div>
-            <div class="row" id="septemberEvents"></div>
-        </div>
+        
+        <div id="tickets-container"></div>
     </div>
 
     <div class="notification-toggle">
-        <div class="control-panel">
-            <button class="btn btn-primary mb-2" onclick="toggleSound()" id="soundToggle">
-                🔔 Sound Alerts: ON
-            </button>
-            <button class="btn btn-secondary mb-2" onclick="testNotifications()" id="testSound">
-                🔊 Test Alerts
-            </button>
-            <div class="check-countdown">
-                Next check in: <span id="countdown">15</span>s
-            </div>
-        </div>
+        <button class="btn btn-success" onclick="toggleSound()" id="soundToggle">
+            🔔 Sound ON
+        </button>
+        <button class="btn btn-info" onclick="testNotification()">
+            🔊 Test Alert
+        </button>
     </div>
 
     <audio id="alertSound" preload="auto">
-        <source src="https://cdn.freesound.org/previews/573/573343_11861866-lq.mp3" type="audio/mpeg">
+        <source src="data:audio/mpeg;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAASAAAeMwAUFBQUFCgoKCgoKDw8PDw8PFBQUFBQUG5ubm5uboKCgoKCgpaWlpaWlqqqqqqqqr6+vr6+vtLS0tLS0ubm5ubm5vr6+vr6+v8AAAAATGF2YzU4LjEzAAAAAAAAAAAAAAAAJAQKAAAAAAAAHjOZTf9C//MsAAAAAAAAAAAAAAAAAAAA//tQZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAACzAAICAg4ODg4SEhISEhoaGhoaHh4eHh4iIiIiIiYmJiYmKioqKiouLi4uLjMzMzMzNzc3Nzc8PDw8PD4+Pj4+P8AAAAATGF2ZTU4LjEzAAAAAAAAAAAAAAAAJAQGAAAAAAAACs3yxUAAAAAAAAAAAAAAAAAAAAAA//sQZAAP8AAAaQAAAAgAAA0gAAABAAABpAAAACAAADSAAAAETEFNRTMuOTkuNVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/+xBkBY/wAABpAAAACAAADSAAAAEAAAGkAAAAIAAANIAAAARVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV" type="audio/mpeg">
+        Your browser does not support the audio element.
     </audio>
 
     <script>
-        let soundEnabled = localStorage.getItem('soundEnabled') !== 'false';
-        let previousStates = {};
-        let countdownInterval;
-        const CHECK_INTERVAL = 15000; // 15 seconds
+        let soundEnabled = true;
+        let lastPlayedTime = 0;
+        const MIN_PLAY_INTERVAL = 1000; // Minimum 1 second between plays
+
+        // Initialize sound preference from localStorage
+        try {
+            const savedSound = localStorage.getItem('soundEnabled');
+            if (savedSound !== null) {
+                soundEnabled = savedSound === 'true';
+            }
+        } catch (e) {
+            console.error('Error accessing localStorage:', e);
+        }
 
         function toggleSound() {
             soundEnabled = !soundEnabled;
-            localStorage.setItem('soundEnabled', soundEnabled);
+            try {
+                localStorage.setItem('soundEnabled', soundEnabled);
+            } catch (e) {
+                console.error('Error saving sound preference:', e);
+            }
             updateSoundButton();
+            // Play test sound when enabling
+            if (soundEnabled) {
+                playAlertSound();
+            }
         }
 
         function updateSoundButton() {
-            document.getElementById('soundToggle').innerHTML = 
-                soundEnabled ? '🔔 Sound Alerts: ON' : '🔕 Sound Alerts: OFF';
-            document.getElementById('soundToggle').classList.toggle('btn-primary', soundEnabled);
-            document.getElementById('soundToggle').classList.toggle('btn-secondary', !soundEnabled);
+            const button = document.getElementById('soundToggle');
+            button.innerHTML = soundEnabled ? '🔔 Sound ON' : '🔕 Sound OFF';
+            button.classList.toggle('btn-success', soundEnabled);
+            button.classList.toggle('btn-secondary', !soundEnabled);
         }
 
-        function playAlertSound() {
-            if (soundEnabled) {
-                const audio = document.getElementById('alertSound');
+        async function playAlertSound() {
+            if (!soundEnabled) return;
+            
+            const now = Date.now();
+            if (now - lastPlayedTime < MIN_PLAY_INTERVAL) {
+                console.log('Skipping sound, too soon after last play');
+                return;
+            }
+
+            const audio = document.getElementById('alertSound');
+            
+            try {
+                // Reset and load the audio
                 audio.currentTime = 0;
-                audio.play().catch(e => console.log('Error playing sound:', e));
+                await audio.load();
+                
+                // Create and start a new play promise
+                const playPromise = audio.play();
+                if (playPromise !== undefined) {
+                    playPromise
+                        .then(() => {
+                            lastPlayedTime = now;
+                            console.log('Sound played successfully');
+                        })
+                        .catch(error => {
+                            console.error('Error playing sound:', error);
+                            // Try to play again with user interaction
+                            const retryPlay = () => {
+                                audio.play()
+                                    .then(() => lastPlayedTime = Date.now())
+                                    .catch(e => console.error('Retry failed:', e));
+                                document.removeEventListener('click', retryPlay);
+                            };
+                            document.addEventListener('click', retryPlay, { once: true });
+                        });
+                }
+            } catch (e) {
+                console.error('Error in playAlertSound:', e);
             }
         }
 
-        function testNotifications() {
-            playAlertSound();
+        function testNotification() {
             const testCard = document.querySelector('.ticket-card');
             if (testCard) {
                 testCard.classList.add('urgent-alert');
-                setTimeout(() => testCard.classList.remove('urgent-alert'), 3000);
+                setTimeout(() => testCard.classList.remove('urgent-alert'), 2000);
             }
+            playAlertSound();
         }
+
+        let previousStates = {};
+        const CHECK_INTERVAL = 15000; // 15 seconds
+        let lastCheckTime = new Date();
 
         function updateCountdown() {
-            const countdownNumber = document.querySelector('.countdown-number');
-            const progressCircle = document.querySelector('.progress');
-            const circumference = 2 * Math.PI * 25; // r=25
-            let seconds = 15;
+            const now = new Date();
+            const timeSinceLastCheck = now - lastCheckTime;
+            const timeUntilNextCheck = Math.max(0, CHECK_INTERVAL - timeSinceLastCheck);
+            const secondsLeft = Math.ceil(timeUntilNextCheck / 1000);
             
-            if (countdownInterval) {
-                clearInterval(countdownInterval);
-            }
+            // Update countdown number
+            const countdownNumber = document.querySelector('.countdown-number');
+            countdownNumber.textContent = secondsLeft;
+            
+            // Update progress circle
+            const progress = document.querySelector('.countdown-circle .progress');
+            const percentage = (timeUntilNextCheck / CHECK_INTERVAL) * 100;
+            const dashOffset = 283 * (1 - percentage / 100);
+            progress.style.strokeDashoffset = dashOffset;
             
             // Update next check time
-            const now = new Date();
-            const nextCheck = new Date(now.getTime() + CHECK_INTERVAL);
+            const nextCheckTime = new Date(lastCheckTime.getTime() + CHECK_INTERVAL);
             document.getElementById('nextCheckTime').textContent = 
-                nextCheck.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
-            
-            countdownInterval = setInterval(() => {
-                seconds--;
-                
-                // Update number
-                countdownNumber.textContent = seconds;
-                
-                // Update progress circle
-                const offset = circumference * (1 - seconds / 15);
-                progressCircle.style.strokeDasharray = circumference;
-                progressCircle.style.strokeDashoffset = offset;
-                
-                // Change color based on time remaining
-                if (seconds <= 5) {
-                    progressCircle.style.stroke = '#dc3545';
-                    countdownNumber.style.color = '#dc3545';
-                } else if (seconds <= 10) {
-                    progressCircle.style.stroke = '#ffc107';
-                    countdownNumber.style.color = '#ffc107';
-                }
-                
-                if (seconds <= 0) {
-                    clearInterval(countdownInterval);
-                }
-            }, 1000);
+                nextCheckTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' });
         }
 
-        async function updateDisplay() {
-            try {
-                const response = await fetch('/api/tickets');
-                const tickets = await response.json();
-                
-                for (const [id, ticket] of Object.entries(tickets)) {
-                    const previousStatus = previousStates[id]?.status;
-                    const currentStatus = ticket.status;
-                    
-                    if (previousStatus && previousStatus !== currentStatus) {
-                        if (currentStatus.toLowerCase().includes('available') || 
-                            currentStatus.toLowerCase().includes('check now')) {
-                            playAlertSound();
-                        }
-                    }
-                    
-                    previousStates[id] = { ...ticket };
-                }
-
-                // Update UI sections
-                document.getElementById('mainEventContainer').innerHTML = 
-                    createEventCard('main_page', tickets['main_page'], true);
-
-                const julyEvents = Object.entries(tickets)
-                    .filter(([id]) => id.startsWith('jul_'))
-                    .map(([id, event]) => createEventCard(id, event))
-                    .join('');
-                document.getElementById('julyEvents').innerHTML = julyEvents;
-
-                const augustEvents = Object.entries(tickets)
-                    .filter(([id]) => id.startsWith('aug_'))
-                    .map(([id, event]) => createEventCard(id, event))
-                    .join('');
-                document.getElementById('augustEvents').innerHTML = augustEvents;
-
-                const septemberEvents = Object.entries(tickets)
-                    .filter(([id]) => id.startsWith('sep_'))
-                    .map(([id, event]) => createEventCard(id, event))
-                    .join('');
-                document.getElementById('septemberEvents').innerHTML = septemberEvents;
-
-                updateCountdown();
-                
-            } catch (error) {
-                console.error('Error updating display:', error);
+        function createEventCard(id, event) {
+            const div = document.createElement('div');
+            div.className = 'col-md-4 mb-4';
+            div.setAttribute('data-event-id', id);
+            
+            let statusClass = 'alert-info';
+            let urgencyClass = '';
+            
+            if (event.status.includes('AVAILABLE')) {
+                statusClass = 'alert-success';
+                urgencyClass = 'urgent-alert';
+            } else if (event.status.includes('Not Available')) {
+                statusClass = 'alert-danger';
+            } else if (event.status.includes('CHECK NOW')) {
+                statusClass = 'alert-warning';
+                urgencyClass = 'urgent-alert';
             }
-        }
 
-        function createEventCard(id, event, isMainEvent) {
-            let alertClass, statusText;
-            
-            // Determine status type and text
-            if (event.status.toLowerCase().includes('available')) {
-                alertClass = 'alert-success';
-                statusText = '🎫 TICKETS AVAILABLE!';
-            } else if (event.status.toLowerCase().includes('check now')) {
-                alertClass = 'alert-danger';
-                statusText = '⚡ CHECK NOW!';
-            } else if (event.status.toLowerCase().includes('checking')) {
-                alertClass = 'alert-info';
-                statusText = '🔄 Checking...';
-            } else {
-                alertClass = 'alert-warning';
-                statusText = '⏳ Not Available';
-            }
-            
-            const isUrgent = alertClass === 'alert-success' || alertClass === 'alert-danger';
-            
-            return `
-                <div class="col-md-6 mb-4">
-                    <div class="card ticket-card ${isMainEvent ? 'main-event' : ''} ${isUrgent ? 'urgent-alert' : ''}" id="card-${id}">
-                        <div class="status-alert ${alertClass}"></div>
-                        <div class="card-body">
-                            <div class="d-flex justify-content-between align-items-start">
-                                <h5 class="card-title">${event.name}</h5>
-                                <span class="badge ${alertClass} status-badge">
-                                    ${statusText}
-                                </span>
-                            </div>
-                            <p class="concert-date mb-2">${event.date}</p>
-                            <div class="d-flex justify-content-between align-items-center">
-                                <small class="last-checked">Last checked: ${event.lastChecked}</small>
-                                <a href="${event.url}" target="_blank" class="btn btn-sm ${isUrgent ? 'btn-danger' : 'btn-outline-primary'}">
-                                    ${isUrgent ? '🎫 Check Tickets Now!' : 'View on Ticketera'}
-                                </a>
-                            </div>
+            div.innerHTML = `
+                <div class="card ticket-card ${urgencyClass}">
+                    <div class="status-alert ${statusClass}"></div>
+                    <div class="card-body">
+                        <h5 class="card-title">${event.name}</h5>
+                        <div class="status-badge badge ${statusClass} mb-2">
+                            ${event.status}
                         </div>
+                        <p class="card-text">
+                            <small class="text-muted">
+                                Last checked: ${event.lastChecked}
+                            </small>
+                        </p>
+                        ${event.url ? `
+                            <a href="${event.url}" target="_blank" class="btn btn-primary btn-sm">
+                                Check Tickets 🎟️
+                            </a>
+                        ` : ''}
                     </div>
-                </div>`;
+                </div>
+            `;
+
+            // Add click handler to play sound when urgent
+            if (urgencyClass) {
+                const card = div.querySelector('.ticket-card');
+                card.addEventListener('click', () => {
+                    if (event.status.includes('AVAILABLE')) {
+                        playAlertSound();
+                    }
+                });
+            }
+
+            return div;
         }
 
-        // Initialize sound button state
-        updateSoundButton();
+        function updateDisplay() {
+            fetch('/api/tickets')
+                .then(response => response.json())
+                .then(data => {
+                    const container = document.getElementById('tickets-container');
+                    container.innerHTML = '';
 
-        // Update display every 15 seconds
+                    // Group events by month
+                    const months = {
+                        'July': [],
+                        'August': [],
+                        'September': []
+                    };
+
+                    Object.entries(data).forEach(([id, event]) => {
+                        const month = event.date.split(' ')[0];
+                        if (months[month]) {
+                            months[month].push({ id, ...event });
+                        }
+                    });
+
+                    // Check for status changes and trigger notifications
+                    Object.entries(data).forEach(([id, event]) => {
+                        const prevStatus = previousStates[id]?.status;
+                        const currentStatus = event.status;
+
+                        if (prevStatus && prevStatus !== currentStatus) {
+                            // Always notify for available tickets
+                            if (currentStatus.includes('AVAILABLE')) {
+                                playAlertSound();
+                                const card = document.querySelector(`[data-event-id="${id}"]`);
+                                if (card) {
+                                    card.classList.add('urgent-alert');
+                                    setTimeout(() => card.classList.remove('urgent-alert'), 5000);
+                                }
+                            }
+                            // Notify for unknown status that needs checking
+                            else if (currentStatus.includes('CHECK NOW')) {
+                                playAlertSound();
+                            }
+                        }
+                    });
+
+                    // Update previous states
+                    previousStates = Object.entries(data).reduce((acc, [id, event]) => {
+                        acc[id] = { status: event.status };
+                        return acc;
+                    }, {});
+
+                    // Display events grouped by month
+                    Object.entries(months).forEach(([month, events]) => {
+                        if (events.length > 0) {
+                            const monthDiv = document.createElement('div');
+                            monthDiv.className = 'month-divider';
+                            monthDiv.textContent = `${month} 2025`;
+                            container.appendChild(monthDiv);
+
+                            events.forEach(event => {
+                                container.appendChild(createEventCard(event.id, event));
+                            });
+                        }
+                    });
+
+                    // Update last check time
+                    lastCheckTime = new Date();
+                    updateCountdown();
+                })
+                .catch(error => {
+                    console.error('Error fetching tickets:', error);
+                });
+        }
+
+        // Initialize
+        updateSoundButton();
         updateDisplay();
         setInterval(updateDisplay, CHECK_INTERVAL);
+        setInterval(updateCountdown, 1000);
+
+        // Test audio loading
+        const audio = document.getElementById('alertSound');
+        audio.load();
     </script>
 </body>
 </html>

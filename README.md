@@ -1,34 +1,54 @@
 # Bad Bunny Ticket Monitor
 
-Automated ticket monitoring system for Bad Bunny concerts. Get instant notifications when tickets become available!
+Automated ticket monitoring system for Bad Bunny concerts in 2025. Monitors Ticketera for ticket availability and sends notifications via Discord.
 
 ## Features
 
-- Real-time ticket monitoring (checks every 15 seconds)
-- Discord notifications with direct ticket links
-- Monitors multiple concert dates:
-  - July 2025: 12, 18, 19
-  - August 2025: 1-3, 8-10, 15-17, 22-24, 29-31
-  - September 2025: 5-7, 12-14
-- Visual and audio alerts
-- Mobile-friendly interface
+- Monitors multiple concert dates (July, August, September 2025)
+- 15-second check interval
+- Discord notifications with @everyone mentions for urgent updates
+- Visual indicators and sound alerts
+- Real-time status tracking
+- Countdown timer
 
-## Setup
+## Deployment on Render
 
-1. Install requirements:
-```bash
-pip install -r requirements.txt
-```
+1. Fork or clone this repository
+2. Create a new Web Service on Render
+3. Connect your GitHub repository
+4. Configure the following settings:
+   - Build Command: `pip install -r requirements.txt`
+   - Start Command: `gunicorn -c gunicorn_config.py app:app`
+   - Environment Variables:
+     - `CHECK_INTERVAL`: 15 (seconds between checks)
+     - `DISCORD_WEBHOOK_URL`: Your Discord webhook URL
+
+The service will automatically deploy when you push changes to your repository.
+
+## Local Development
+
+1. Install dependencies:
+   ```bash
+   pip install -r requirements.txt
+   ```
 
 2. Run the application:
-```bash
-python app.py
-```
+   ```bash
+   python app.py
+   ```
 
-## Discord Notifications
+## Concert Dates
 
-The monitor sends notifications through Discord with:
-- @everyone mentions for urgent updates
-- Direct links to ticket pages
-- Timestamps and urgency indicators
-- Follow-up reminders
+### July 2025
+- July 12, 18, 19
+
+### August 2025
+- August 1-3
+- August 8-10
+- August 15-17
+- August 22-24
+- August 29-31
+
+### September 2025
+- September 5-7
+- September 12-14
