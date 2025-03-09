@@ -17,6 +17,44 @@ let userInfo = {
     }
 };
 
+// Sample data for random generation
+const sampleData = {
+    firstNames: ["Juan", "Luis", "Carlos", "Miguel", "José", "Pedro", "Antonio", "Manuel", "Francisco", "Roberto", "Fernando", "Rafael", "Javier", "Sergio", "Ricardo", "Daniel", "Eduardo", "Mario", "Jorge", "Alberto", "Alejandro"],
+    lastNames: ["Rodríguez", "González", "Hernández", "López", "Martínez", "Pérez", "Sánchez", "Ramírez", "Torres", "Flores", "Rivera", "Gómez", "Díaz", "Reyes", "Cruz", "Morales", "Ortiz", "Vázquez", "Castillo", "Mendoza", "Jiménez", "García", "Rosario", "Figueroa", "Acosta", "Ayala", "Medina", "Santiago", "Colón", "Delgado", "Rivera", "Nieves", "Vega"],
+    streets: ["Calle Sol", "Avenida Fernández Juncos", "Calle Luna", "Avenida Ashford", "Calle Loíza", "Calle Fortaleza", "Calle San Francisco", "Avenida Ponce de León", "Avenida Roosevelt", "Calle 31 SO", "Calle San Sebastián", "Avenida Jesús T. Piñero", "Calle Recinto Sur", "Avenida Constitución", "Calle Tanca", "Avenida Luis Muñoz Rivera"],
+    streetNumbers: ["100", "200", "300", "400", "500", "600", "700", "800", "900", "1000", "1100", "1200", "1300", "1400", "1500", "1600", "1700", "1800", "1900", "2000"],
+    cities: ["San Juan", "Bayamón", "Carolina", "Ponce", "Caguas", "Guaynabo", "Mayagüez", "Trujillo Alto", "Fajardo", "Arecibo", "Vega Baja", "Humacao", "Aguadilla", "Isabela", "Dorado", "Hatillo", "Manatí", "Cayey", "Guayama", "Río Grande", "Coamo", "Rincón"],
+    states: ["PR"],
+    zipCodes: ["00901", "00902", "00906", "00907", "00909", "00911", "00913", "00917", "00920", "00921", "00923", "00926", "00927", "00934", "00936", "00949", "00950", "00959", "00961", "00965", "00966", "00969", "00976", "00979"]
+};
+
+// Generate random phone number (Puerto Rico format)
+function generateRandomPhone() {
+    const areaCodes = ["787", "939"];
+    const areaCode = areaCodes[Math.floor(Math.random() * areaCodes.length)];
+    const middle = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+    const end = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
+    return `${areaCode}-${middle}-${end}`;
+}
+
+// Generate random data for everything except email
+function generateRandomUserInfo() {
+    const getRandomItem = arr => arr[Math.floor(Math.random() * arr.length)];
+    
+    userInfo.firstName = getRandomItem(sampleData.firstNames);
+    userInfo.lastName = getRandomItem(sampleData.lastNames);
+    userInfo.phone = generateRandomPhone();
+    userInfo.address.street = `${getRandomItem(sampleData.streetNumbers)} ${getRandomItem(sampleData.streets)}`;
+    userInfo.address.city = getRandomItem(sampleData.cities);
+    userInfo.address.state = getRandomItem(sampleData.states);
+    userInfo.address.zip = getRandomItem(sampleData.zipCodes);
+    
+    // Email is intentionally left blank for the user to fill in
+    userInfo.email = "";
+    
+    return userInfo;
+}
+
 // Load saved info from localStorage
 function loadSavedInfo() {
     const savedInfo = localStorage.getItem('ticketeraUserInfo');
@@ -173,10 +211,56 @@ function updateBookmarkletLink() {
     }
 }
 
+// Function to add a random autofill button
+function addRandomAutofillButton() {
+    const form = document.getElementById('autofill-settings-form');
+    if (form) {
+        const actionDiv = form.querySelector('.autofill-actions');
+        if (actionDiv) {
+            // Create random fill button
+            const randomButton = document.createElement('button');
+            randomButton.type = 'button';
+            randomButton.id = 'random-autofill-settings';
+            randomButton.className = 'btn btn-secondary';
+            randomButton.innerHTML = '<i class="fas fa-dice"></i> Generate Random Info';
+            
+            // Add click event
+            randomButton.addEventListener('click', function() {
+                // Generate random info
+                generateRandomUserInfo();
+                
+                // Update form with random data (except email)
+                document.getElementById('autofill-firstname').value = userInfo.firstName;
+                document.getElementById('autofill-lastname').value = userInfo.lastName;
+                document.getElementById('autofill-phone').value = userInfo.phone;
+                document.getElementById('autofill-street').value = userInfo.address.street;
+                document.getElementById('autofill-city').value = userInfo.address.city;
+                document.getElementById('autofill-state').value = userInfo.address.state;
+                document.getElementById('autofill-zip').value = userInfo.address.zip;
+                
+                // Save to localStorage
+                saveUserInfo();
+                
+                // Update bookmarklet
+                updateBookmarkletLink();
+                
+                // Notify user
+                alert('Random information generated! Email field left empty for your own list.');
+            });
+            
+            // Insert before the save button
+            actionDiv.insertBefore(randomButton, actionDiv.firstChild);
+        }
+    }
+}
+
 // Initialize the autofill settings in the UI
 function initAutofillSettings() {
-    // Load saved info
-    loadSavedInfo();
+    // Load saved info, if none exists, generate random
+    const hasUserInfo = loadSavedInfo();
+    if (!hasUserInfo) {
+        generateRandomUserInfo();
+    }
     
     // Populate the form fields with saved values
     const form = document.getElementById('autofill-settings-form');
@@ -200,6 +284,9 @@ function initAutofillSettings() {
             });
         }
     }
+    
+    // Add random autofill button
+    addRandomAutofillButton();
     
     // Set up the bookmarklet link
     updateBookmarkletLink();
