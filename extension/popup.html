@@ -1,0 +1,240 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Ticketera Autofill</title>
+  <meta charset="UTF-8">
+  <style>
+    body {
+      font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+      width: 320px;
+      padding: 15px;
+      background-color: #f5f5f5;
+    }
+    
+    h1 {
+      font-size: 18px;
+      color: #9c27b0;
+      margin-top: 0;
+      text-align: center;
+    }
+    
+    .container {
+      background-color: white;
+      border-radius: 8px;
+      padding: 15px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    }
+    
+    .field-group {
+      margin-bottom: 10px;
+    }
+    
+    label {
+      display: block;
+      font-size: 12px;
+      font-weight: bold;
+      margin-bottom: 3px;
+      color: #555;
+    }
+    
+    input {
+      width: 100%;
+      padding: 8px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+      box-sizing: border-box;
+      font-size: 13px;
+    }
+    
+    input:read-only {
+      background-color: #f8f8f8;
+    }
+    
+    .field-row {
+      display: flex;
+      gap: 10px;
+    }
+    
+    .field-row .field-group {
+      flex: 1;
+    }
+    
+    .button-row {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 15px;
+    }
+    
+    button {
+      padding: 8px 15px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: all 0.2s;
+    }
+    
+    .toggle-container {
+      display: flex;
+      align-items: center;
+      margin: 15px 0;
+    }
+    
+    .toggle-switch {
+      position: relative;
+      display: inline-block;
+      width: 46px;
+      height: 24px;
+      margin-right: 10px;
+    }
+    
+    .toggle-switch input {
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    
+    .slider {
+      position: absolute;
+      cursor: pointer;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background-color: #ccc;
+      transition: .4s;
+      border-radius: 24px;
+    }
+    
+    .slider:before {
+      position: absolute;
+      content: "";
+      height: 16px;
+      width: 16px;
+      left: 4px;
+      bottom: 4px;
+      background-color: white;
+      transition: .4s;
+      border-radius: 50%;
+    }
+    
+    input:checked + .slider {
+      background-color: #9c27b0;
+    }
+    
+    input:checked + .slider:before {
+      transform: translateX(22px);
+    }
+    
+    .toggle-label {
+      font-size: 14px;
+      margin-left: 5px;
+    }
+    
+    #generateBtn {
+      background-color: #9c27b0;
+      color: white;
+      flex: 2;
+    }
+    
+    #generateBtn:hover {
+      background-color: #7b1fa2;
+    }
+    
+    #fillBtn {
+      background-color: #2196f3;
+      color: white;
+      flex: 1;
+    }
+    
+    #fillBtn:hover {
+      background-color: #1976d2;
+    }
+    
+    .note {
+      font-size: 11px;
+      color: #666;
+      margin-top: 15px;
+      line-height: 1.4;
+    }
+
+    .note-warning {
+      color: #e91e63;
+      font-weight: bold;
+    }
+  </style>
+</head>
+<body>
+  <h1>Ticketera Autofill</h1>
+  <p style="text-align: center; font-size: 13px;">Bad Bunny Checkout Helper</p>
+  
+  <div class="container">
+    <div class="field-row">
+      <div class="field-group">
+        <label for="firstName">First Name</label>
+        <input type="text" id="firstName" readonly>
+      </div>
+      <div class="field-group">
+        <label for="lastName">Last Name</label>
+        <input type="text" id="lastName" readonly>
+      </div>
+    </div>
+    
+    <div class="field-group">
+      <label for="email">Email <span class="note-warning">(Add your email)</span></label>
+      <input type="email" id="email" placeholder="Your email address">
+    </div>
+    
+    <div class="field-group">
+      <label for="phone">Phone</label>
+      <input type="text" id="phone" readonly>
+    </div>
+    
+    <div class="field-group">
+      <label for="street">Street Address</label>
+      <input type="text" id="street" readonly>
+    </div>
+    
+    <div class="field-row">
+      <div class="field-group">
+        <label for="city">City</label>
+        <input type="text" id="city" readonly>
+      </div>
+      <div class="field-group" style="width: 40%;">
+        <label for="state">State</label>
+        <input type="text" id="state" readonly>
+      </div>
+    </div>
+    
+    <div class="field-group">
+      <label for="zip">ZIP Code</label>
+      <input type="text" id="zip" readonly>
+    </div>
+    
+    <div class="toggle-container">
+      <label class="toggle-switch">
+        <input type="checkbox" id="showNotificationsToggle" checked>
+        <span class="slider"></span>
+      </label>
+      <span class="toggle-label">Show notifications</span>
+    </div>
+    
+    <div class="button-row">
+      <button id="generateBtn">
+        Generate New Random Info
+      </button>
+      <button id="fillBtn">Fill Form</button>
+    </div>
+    
+    <p class="note">
+      <strong>How to use:</strong><br>
+      1. Click "Generate" for random info<br>
+      2. Enter your email address<br>
+      3. Click "Fill Form" on checkout page<br>
+      <span class="note-warning">Email must be filled manually!</span>
+    </p>
+  </div>
+  
+  <script src="popup.js"></script>
+</body>
+</html>

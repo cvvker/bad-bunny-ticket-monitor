@@ -1,0 +1,250 @@
+/* Cart Automation Styles */
+
+.cart-container {
+    background-color: var(--card-bg);
+    border-radius: 10px;
+    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
+    margin-bottom: 20px;
+    max-width: 800px;
+    display: none;
+    overflow: hidden;
+    position: relative;
+    transition: all 0.3s ease;
+    opacity: 0;
+    transform: translateY(-20px);
+}
+
+.cart-container.visible {
+    display: block;
+    opacity: 1;
+    transform: translateY(0);
+}
+
+.cart-container h3 {
+    background-color: var(--primary-color);
+    color: white;
+    padding: 15px 20px;
+    margin: 0;
+    border-radius: 10px 10px 0 0;
+    font-size: 1.4rem;
+    display: flex;
+    align-items: center;
+}
+
+.cart-container h3 i {
+    margin-right: 10px;
+}
+
+.cart-form {
+    padding: 20px;
+}
+
+.cart-description {
+    background-color: rgba(0, 0, 0, 0.1);
+    padding: 10px 15px;
+    border-radius: 5px;
+    margin-bottom: 20px;
+}
+
+.cart-description p {
+    margin: 0;
+    color: var(--text-color);
+    font-size: 0.9rem;
+}
+
+.cart-settings-body {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 15px;
+}
+
+.cart-actions {
+    margin-top: 20px;
+    display: flex;
+    justify-content: flex-end;
+}
+
+/* Toggle switch styles */
+.switch-container {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.toggle-switch {
+    position: relative;
+    width: 50px;
+    height: 24px;
+}
+
+.toggle-input {
+    opacity: 0;
+    width: 0;
+    height: 0;
+}
+
+.toggle-label {
+    position: absolute;
+    cursor: pointer;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background-color: #ccc;
+    transition: .4s;
+    border-radius: 34px;
+}
+
+.toggle-label:before {
+    position: absolute;
+    content: "";
+    height: 16px;
+    width: 16px;
+    left: 4px;
+    bottom: 4px;
+    background-color: white;
+    transition: .4s;
+    border-radius: 50%;
+}
+
+.toggle-input:checked + .toggle-label {
+    background-color: var(--primary-color);
+}
+
+.toggle-input:checked + .toggle-label:before {
+    transform: translateX(26px);
+}
+
+/* Cart status section */
+.cart-status {
+    margin-top: 30px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    padding-top: 20px;
+}
+
+.cart-status h4 {
+    margin-bottom: 10px;
+    font-size: 1.1rem;
+    color: var(--text-color);
+}
+
+.cart-status-list {
+    margin-bottom: 20px;
+}
+
+.cart-item {
+    background-color: rgba(0, 0, 0, 0.1);
+    border-radius: 5px;
+    padding: 10px 15px;
+    margin-bottom: 10px;
+}
+
+.cart-item.active {
+    border-left: 4px solid #ffc107;
+}
+
+.cart-item.completed {
+    border-left: 4px solid #28a745;
+}
+
+.cart-item-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 5px;
+}
+
+.cart-item-title {
+    font-weight: bold;
+    color: var(--text-color);
+}
+
+.cart-item-status {
+    font-size: 0.8rem;
+    background-color: rgba(0, 0, 0, 0.2);
+    padding: 3px 8px;
+    border-radius: 10px;
+}
+
+.cart-item-body {
+    font-size: 0.9rem;
+}
+
+.cart-item-body p {
+    margin: 5px 0;
+}
+
+.no-status {
+    color: rgba(255, 255, 255, 0.5);
+    font-style: italic;
+}
+
+/* Cart button styles */
+.cart-button {
+    margin-left: 5px;
+}
+
+/* Notification styles */
+#notification-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 9999;
+    max-width: 350px;
+}
+
+.notification {
+    background-color: var(--card-bg);
+    color: var(--text-color);
+    border-radius: 5px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    margin-bottom: 10px;
+    overflow: hidden;
+    animation: slideIn 0.3s ease-out forwards;
+    border-left: 4px solid var(--primary-color);
+}
+
+.notification-hiding {
+    animation: slideOut 0.5s ease-in forwards;
+}
+
+.notification-success {
+    border-left-color: #28a745;
+}
+
+.notification-error {
+    border-left-color: #dc3545;
+}
+
+.notification-content {
+    padding: 15px;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+@keyframes slideOut {
+    from {
+        transform: translateX(0);
+        opacity: 1;
+    }
+    to {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+    .cart-settings-body {
+        grid-template-columns: 1fr;
+    }
+}

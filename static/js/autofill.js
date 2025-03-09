@@ -243,7 +243,8 @@ function setupAutofillButton() {
 // Initialize immediately when the script loads
 function init() {
     console.log('Autofill script initializing');
-    updateBookmarkletURL();
+    // Don't automatically update bookmarklet URL with random data
+    // Only set up the button handlers
     setupAutofillButton();
 }
 
@@ -256,13 +257,13 @@ if (document.readyState === 'complete' || document.readyState === 'interactive')
     setTimeout(init, 100);
 }
 
-// Force initialization when the autofill settings container becomes visible
-const toggleInterval = setInterval(function() {
-    const container = document.getElementById('autofill-settings-container');
-    if (container && container.classList.contains('visible')) {
-        init();
-    }
-}, 500);
+// Removing the interval that continuously calls init()
+// const toggleInterval = setInterval(function() {
+//     const container = document.getElementById('autofill-settings-container');
+//     if (container && container.classList.contains('visible')) {
+//         init();
+//     }
+// }, 500);
 
-// Call init right away
-init();
+// Don't call init directly - we only want it called once
+// init();

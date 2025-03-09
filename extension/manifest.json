@@ -1,0 +1,38 @@
+{
+  "manifest_version": 3,
+  "name": "Ticketera Autofill",
+  "version": "1.0",
+  "description": "Fills checkout forms on Ticketera for Bad Bunny concerts with a simple click",
+  "icons": {
+    "16": "images/icon16.png",
+    "48": "images/icon48.png",
+    "128": "images/icon128.png"
+  },
+  "action": {
+    "default_popup": "popup.html",
+    "default_icon": {
+      "16": "images/icon16.png",
+      "48": "images/icon48.png",
+      "128": "images/icon128.png"
+    }
+  },
+  "permissions": [
+    "storage",
+    "activeTab",
+    "scripting"
+  ],
+  "host_permissions": [
+    "https://*.ticketera.com/*",
+    "https://choli.ticketera.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": ["*://*.ticketera.com/*", "*://*.choli.pr/*"],
+      "js": ["content.js", "cart_content.js"],
+      "run_at": "document_end"
+    }
+  ],
+  "background": {
+    "service_worker": "background.js"
+  }
+}
