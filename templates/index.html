@@ -482,7 +482,7 @@
 
     <audio id="alertSound" preload="auto" style="display: none;">
         <!-- Default alert sound - base64 encoded MP3 -->
-        <source src="data:audio/mpeg;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAASAAAeMwAUFBQUFCgoKCgoKDw8PDw8PFBQUFBQUG5ubm5uboKCgoKCgpaWlpaWlqqqqqqqqr6+vr6+vtLS0tLS0ubm5ubm5vr6+vr6+v8AAAAATGF2YzU4LjEzAAAAAAAAAAAAAAAAJAQKAAAAAAAAHjOZTf9C//MsAAAAAAAAAAAAAAAAAAAA//tQZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAACzAAICAg4ODg4SEhISEhoaGhoaHh4eHh4iIiIiIiYmJiYmKioqKiouLi4uLjMzMzMzNzc3Nzc8PDw8PD4+Pj4+P8AAAAATGF2ZTU4LjEzAAAAAAAAAAAAAAAAJAQGAAAAAAAACs3yxUAAAAAAAAAAAAAAAAAAAAAA//sQZAAP8AAAaQAAAAgAAA0gAAABAAABpAAAACAAADSAAAAETEFNRTMuOTkuNVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/+xBkBY/wAABpAAAACAAADSAAAAEAAAGkAAAAIAAANIAAAARVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV">
+        <source src="data:audio/mpeg;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAASAAAeMwAUFBQUFCgoKCgoKDw8PDw8PFBQUFBQUG5ubm5uboKCgoKCgpaWlpaWlqqqqqqqqr6+vr6+vtLS0tLS0ubm5ubm5vr6+vr6+v8AAAAATGF2YzU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAASAAAeMwAUFBQUFCgoKCgoKDw8PDw8PFBQUFBQUG5ubm5uboKCgoKCgpaWlpaWlqqqqqqqqr6+vr6+vtLS0tLS0ubm5ubm5vr6+vr6+v8AAAAATGF2YzU4LjEzAAAAAAAAAAAAAAAAJAQKAAAAAAAAHjOZTf9C//MsAAAAAAAAAAAAAAAAAAAA//tQZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAACzAAICAg4ODg4SEhISEhoaGhoaHh4eHh4iIiIiIiYmJiYmKioqKiouLi4uLjMzMzMzNzc3Nzc8PDw8PD4+Pj4+P8AAAAATGF2ZTU4LjEzAAAAAAAAAAAAAAAAJAQGAAAAAAAACs3yxUAAAAAAAAAAAAAAAAAAAAAA//sQZAAP8AAAaQAAAAgAAA0gAAABAAABpAAAACAAADSAAAAETEFNRTMuOTkuNVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV">
         Your browser does not support the audio element.
     </audio>
 
@@ -507,41 +507,35 @@
                     // Create month header
                     const monthDiv = document.createElement('div');
                     monthDiv.className = 'month-section mb-4';
-                    monthDiv.innerHTML = `<h2 class="month-title">${month} 2025</h2>`;
-                    container.appendChild(monthDiv);
-                    
-                    // Create card row
-                    const row = document.createElement('div');
-                    row.className = 'row';
-                    
-                    // Add cards for each date
-                    dates[month].forEach(day => {
-                        const id = `${month.toLowerCase()}-${day}`;
-                        const date = `${month} ${day}, 2025`;
-                        
-                        // Create card
-                        const col = document.createElement('div');
-                        col.className = 'col-md-4 mb-4';
-                        col.innerHTML = `
-                            <div class="card ticket-card" data-event-id="${id}">
-                                <div class="status-alert alert-info"></div>
-                                <div class="card-body">
-                                    <h5 class="card-title">Bad Bunny - ${date}</h5>
-                                    <div class="d-flex justify-content-between align-items-center mb-3">
-                                        <span class="badge alert-info status-badge">⚡ Loading...</span>
+                    monthDiv.innerHTML = `<h2 class="month-title">${month} 2025</h2>
+                    <div class="row">
+                        ${dates[month].map(day => {
+                            const id = `${month.toLowerCase()}-${day}`;
+                            const date = `${month} ${day}, 2025`;
+                            const ticketUrl = getDirectUrl(month, day);
+                            
+                            return `
+                                <div class="col-md-4 mb-4">
+                                    <div class="card ticket-card" data-event-id="${id}">
+                                        <div class="status-alert alert-info"></div>
+                                        <div class="card-body">
+                                            <h5 class="card-title">Bad Bunny - ${date}</h5>
+                                            <div class="d-flex justify-content-between align-items-center mb-3">
+                                                <span class="badge alert-info status-badge">⚡ Loading...</span>
+                                            </div>
+                                            <p class="card-text">Last checked: Initializing...</p>
+                                            <a href="${ticketUrl}" class="btn btn-primary" target="_blank">Check Tickets</a>
+                                            <button onclick="startAutoCart('${id}')" class="btn btn-sm btn-outline-success cart-button">
+                                                <i class="fas fa-cart-plus"></i> Auto-Cart
+                                            </button>
+                                        </div>
                                     </div>
-                                    <p class="card-text">Last checked: Initializing...</p>
-                                    <a href="https://choli.ticketera.com/" class="btn btn-primary" target="_blank">Check Tickets</a>
-                                    <button onclick="startAutoCart('${id}')" class="btn btn-sm btn-outline-success cart-button">
-                                        <i class="fas fa-cart-plus"></i> Auto-Cart
-                                    </button>
                                 </div>
-                            </div>
-                        `;
-                        row.appendChild(col);
-                    });
-                    
-                    container.appendChild(row);
+                            `;
+                        }).join('')}
+                    </div>
+                    `;
+                    container.appendChild(monthDiv);
                 }
             });
             
@@ -563,11 +557,46 @@
             'September': ['5', '6', '7', '12', '13', '14']
         };
 
-        // Always generate fallback data for all dates at startup
-        const FALLBACK_DATA = generateFallbackData();
-        let cachedData = FALLBACK_DATA;  // Start with fallback data immediately
+        // Specific URLs for each Bad Bunny concert date - HARDCODED DIRECTLY
+        const DIRECT_URLS = {
+            "july-12": "https://choli.ticketera.com/checkout/67801ac67b15db4542eeed7e?underShop=67801ac67b15db4542eeee56&boxOnly=true",
+            "july-18": "https://choli.ticketera.com/checkout/67801c6485e7610f9b45cb54?underShop=67801c6585e7610f9b45cbce&boxOnly=true",
+            "july-19": "https://choli.ticketera.com/event/67801ccc52c0091cff4e33a7/67801ccd52c0091cff4e33f7",
+            "august-1": "https://choli.ticketera.com/checkout/677ff055a1198f5724fc1158?underShop=677ff055a1198f5724fc11a8",
+            "august-2": "https://choli.ticketera.com/checkout/678276b19c10a4675dcd677b?underShop=678276b19c10a4675dcd67d4",
+            "august-3": "https://choli.ticketera.com/checkout/6782776b39978af92af5d38e?underShop=6782776c39978af92af5d3e7",
+            "august-8": "https://choli.ticketera.com/checkout/678278919c8c608b8c0ebdd2?underShop=678278929c8c608b8c0ebe2b",
+            "august-9": "https://choli.ticketera.com/checkout/6782790885a03cd75926079c?underShop=6782790885a03cd759260898",
+            "august-10": "https://choli.ticketera.com/checkout/67827a23406d3f4b30602cf9?underShop=67827a23406d3f4b30602d52",
+            "august-15": "https://choli.ticketera.com/checkout/67827aecbb4a8ef99dab15e8?underShop=67827aecbb4a8ef99dab1641",
+            "august-16": "https://choli.ticketera.com/checkout/67827b7b0cc574c721710a65?underShop=67827b7c0cc574c721710abe",
+            "august-17": "https://choli.ticketera.com/checkout/67827c0f96690559d725b430?underShop=67827c1096690559d725b489",
+            "august-22": "https://choli.ticketera.com/checkout/67827cf5564ad8f63c77f57d?underShop=67827cf5564ad8f63c77f5d8",
+            "august-23": "https://choli.ticketera.com/checkout/67827da9651f8bdbe0bd3f0e?underShop=67827daa651f8bdbe0bd3f67",
+            "august-24": "https://choli.ticketera.com/checkout/67827f39c3c7b7d600ca906a?underShop=67827f3ac3c7b7d600ca90ce",
+            "august-29": "https://choli.ticketera.com/checkout/67827fce1104e5b3ac99c82a?underShop=67827fce1104e5b3ac99c883",
+            "august-30": "https://choli.ticketera.com/checkout/678281fdc311c1c0762df8d6?underShop=678281fec311c1c0762df93d",
+            "august-31": "https://choli.ticketera.com/checkout/6782827df1edcc48da3866fb?underShop=6782827ef1edcc48da386754",
+            "september-5": "https://choli.ticketera.com/checkout/678285d0a9936d5291154f60?underShop=678285d1a9936d5291154fb9",
+            "september-6": "https://choli.ticketera.com/checkout/67828834bb4a8ef99daf35b9?underShop=67828835bb4a8ef99daf361c",
+            "september-7": "https://choli.ticketera.com/checkout/67828abbf9dde02e3c3f059d?underShop=67828abcf9dde02e3c3f062d",
+            "september-12": "https://choli.ticketera.com/checkout/67828d8333f81d3543d0a47c?underShop=67828d8333f81d3543d0a575",
+            "september-13": "https://choli.ticketera.com/checkout/67828df40952cb5ab00ba5dd?underShop=67828df40952cb5ab00ba636",
+            "september-14": "https://choli.ticketera.com/checkout/67828e871104e5b3ac9ed068?underShop=67828e871104e5b3ac9ed0c1"
+        };
+
+        // Helper function to get direct URL for a specific date
+        function getDirectUrl(month, day) {
+            const key = `${month.toLowerCase()}-${day}`;
+            return DIRECT_URLS[key] || "https://choli.ticketera.com/";
+        }
         
         let soundEnabled = true;
+        
+        // Helper function to get the correct URL for a given date
+        function getUrlForDate(month, day) {
+            return getDirectUrl(month, day);
+        }
         
         function isSoundEnabled() {
             return soundEnabled;
@@ -691,7 +720,7 @@
                             <span class="badge ${statusClass} status-badge">${statusText}</span>
                         </div>
                         <p class="card-text">Last checked: ${event.lastChecked || "Pending..."}</p>
-                        <a href="${event.url}" class="btn btn-primary" target="_blank">Check Tickets</a>
+                        <a href="${event.url || getUrlForDate(id.split('-')[0], id.split('-')[1])}" class="btn btn-primary" target="_blank">Check Tickets</a>
                         <button onclick="startAutoCart('${id}')" class="btn btn-sm btn-outline-success cart-button">
                             <i class="fas fa-cart-plus"></i> Auto-Cart
                         </button>
@@ -700,6 +729,60 @@
             `;
             
             return col;
+        }
+
+        function enhancedUpdateTicketUI(eventId, event) {
+            const container = document.getElementById('tickets-container');
+            if (!container) return;
+            
+            // Find the existing card or create a new one
+            let card = container.querySelector(`.ticket-card[data-event-id="${eventId}"]`);
+            if (!card) {
+                card = createEventCard(eventId, event);
+                container.appendChild(card);
+            } else {
+                // Update the card's content
+                const statusBadge = card.querySelector('.status-badge');
+                const statusAlert = card.querySelector('.status-alert');
+                const cardText = card.querySelector('.card-text');
+                const cardTitle = card.querySelector('.card-title');
+                const checkButton = card.querySelector('.btn-primary');
+                
+                // Determine the appropriate status class
+                let statusClass = 'alert-info';
+                let statusText = event.status || "⚡ Not Yet Available";
+                let urgentClass = '';
+                
+                if (statusText.includes('AVAILABLE') || statusText.includes('CHECK NOW')) {
+                    statusClass = 'alert-success';
+                    urgentClass = 'urgent-alert';
+                } else if (statusText.includes('Queue') || statusText.includes('Waitlist')) {
+                    statusClass = 'alert-warning';
+                } else if (statusText.includes('Not Available') || statusText.includes('Sold Out') || statusText.includes('Blocked')) {
+                    statusClass = 'alert-danger';
+                }
+                
+                // Update the card's status
+                statusBadge.className = `badge ${statusClass} status-badge`;
+                statusBadge.textContent = statusText;
+                statusAlert.className = `status-alert ${statusClass}`;
+                cardText.textContent = `Last checked: ${event.lastChecked || "Pending..."}`;
+                cardTitle.textContent = event.name;
+                
+                // Important: Update the Check Tickets button with direct URL
+                const [month, day] = eventId.split('-');
+                const directUrl = getDirectUrl(month, day);
+                if (checkButton && directUrl) {
+                    checkButton.href = directUrl;
+                    checkButton.removeAttribute('onclick'); // Remove any onclick handler to ensure href works directly
+                }
+                
+                // Add urgent class if needed
+                if (urgentClass && !card.classList.contains(urgentClass)) {
+                    card.classList.add(urgentClass);
+                    setTimeout(() => card.classList.remove(urgentClass), 3000);
+                }
+            }
         }
 
         function updateTicketData() {
@@ -758,51 +841,6 @@
             return fallbackData;
         }
 
-        function enhancedUpdateTicketUI(eventId, event) {
-            const container = document.getElementById('tickets-container');
-            if (!container) return;
-            
-            // Find the existing card or create a new one
-            let card = container.querySelector(`.ticket-card[data-event-id="${eventId}"]`);
-            if (!card) {
-                card = createEventCard(eventId, event);
-                container.appendChild(card);
-            } else {
-                // Update the card's content
-                const statusBadge = card.querySelector('.status-badge');
-                const statusAlert = card.querySelector('.status-alert');
-                const cardText = card.querySelector('.card-text');
-                const cardTitle = card.querySelector('.card-title');
-                
-                // Determine the appropriate status class
-                let statusClass = 'alert-info';
-                let statusText = event.status || "⚡ Not Yet Available";
-                let urgentClass = '';
-                
-                if (statusText.includes('AVAILABLE') || statusText.includes('CHECK NOW')) {
-                    statusClass = 'alert-success';
-                    urgentClass = 'urgent-alert';
-                } else if (statusText.includes('Queue') || statusText.includes('Waitlist')) {
-                    statusClass = 'alert-warning';
-                } else if (statusText.includes('Not Available') || statusText.includes('Sold Out') || statusText.includes('Blocked')) {
-                    statusClass = 'alert-danger';
-                }
-                
-                // Update the card's status
-                statusBadge.className = `badge ${statusClass} status-badge`;
-                statusBadge.textContent = statusText;
-                statusAlert.className = `status-alert ${statusClass}`;
-                cardText.textContent = `Last checked: ${event.lastChecked || "Pending..."}`;
-                cardTitle.textContent = event.name;
-                
-                // Add urgent class if needed
-                if (urgentClass && !card.classList.contains(urgentClass)) {
-                    card.classList.add(urgentClass);
-                    setTimeout(() => card.classList.remove(urgentClass), 3000);
-                }
-            }
-        }
-
         function updateTicketUI(data) {
             const container = document.getElementById('tickets-container');
             if (!container) return;
@@ -843,7 +881,7 @@
                                 <span class="badge alert-info status-badge">${event.status}</span>
                             </div>
                             <p class="card-text">Last checked: ${event.lastChecked}</p>
-                            <a href="${event.url}" class="btn btn-primary" target="_blank">Check Tickets</a>
+                            <a href="${event.url || getUrlForDate(monthLower, day)}" class="btn btn-primary" target="_blank">Check Tickets</a>
                             <button onclick="startAutoCart('${eventId}')" class="btn btn-sm btn-outline-success cart-button">
                                 <i class="fas fa-cart-plus"></i> Auto-Cart
                             </button>
@@ -974,11 +1012,11 @@
         function selectPresetSound(preset) {
             const audio = document.getElementById('alertSound');
             if (preset === 'default') {
-                audio.src = 'data:audio/mpeg;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAASAAAeMwAUFBQUFCgoKCgoKDw8PDw8PFBQUFBQUG5ubm5uboKCgoKCgpaWlpaWlqqqqqqqqr6+vr6+vtLS0tLS0ubm5ubm5vr6+vr6+v8AAAAATGF2YzU4LjEzAAAAAAAAAAAAAAAAJAQKAAAAAAAAHjOZTf9C//MsAAAAAAAAAAAAAAAAAAAA//tQZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAACzAAICAg4ODg4SEhISEhoaGhoaHh4eHh4iIiIiIiYmJiYmKioqKiouLi4uLjMzMzMzNzc3Nzc8PDw8PD4+Pj4+P8AAAAATGF2ZTU4LjEzAAAAAAAAAAAAAAAAJAQGAAAAAAAACs3yxUAAAAAAAAAAAAAAAAAAAAAA//sQZAAP8AAAaQAAAAgAAA0gAAABAAABpAAAACAAADSAAAAETEFNRTMuOTkuNVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/+xBkBY/wAABpAAAACAAADSAAAAEAAAGkAAAAIAAANIAAAARVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV';
+                audio.src = 'data:audio/mpeg;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAASAAAeMwAUFBQUFCgoKCgoKDw8PDw8PFBQUFBQUG5ubm5uboKCgoKCgpaWlpaWlqqqqqqqqr6+vr6+vtLS0tLS0ubm5ubm5vr6+vr6+v8AAAAATGF2YzU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAASAAAeMwAUFBQUFCgoKCgoKDw8PDw8PFBQUFBQUG5ubm5uboKCgoKCgpaWlpaWlqqqqqqqqr6+vr6+vtLS0tLS0ubm5ubm5vr6+vr6+v8AAAAATGF2YzU4LjEzAAAAAAAAAAAAAAAAJAQKAAAAAAAAHjOZTf9C//MsAAAAAAAAAAAAAAAAAAAA//tQZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAACzAAICAg4ODg4SEhISEhoaGhoaHh4eHh4iIiIiIiYmJiYmKioqKiouLi4uLjMzMzMzNzc3Nzc8PDw8PD4+Pj4+P8AAAAATGF2ZTU4LjEzAAAAAAAAAAAAAAAAJAQGAAAAAAAACs3yxUAAAAAAAAAAAAAAAAAAAAAA//sQZAAP8AAAaQAAAAgAAA0gAAABAAABpAAAACAAADSAAAAETEFNRTMuOTkuNVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV';
             } else if (preset === 'loud') {
-                audio.src = 'data:audio/mpeg;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAASAAAeMwAUFBQUFCgoKCgoKDw8PDw8PFBQUFBQUG5ubm5uboKCgoKCgpaWlpaWlqqqqqqqqr6+vr6+vtLS0tLS0ubm5ubm5vr6+vr6+v8AAAAATGF2YzU4LjEzAAAAAAAAAAAAAAAAJAQKAAAAAAAAHjOZTf9C//MsAAAAAAAAAAAAAAAAAAAA//tQZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAACzAAICAg4ODg4SEhISEhoaGhoaHh4eHh4iIiIiIiYmJiYmKioqKiouLi4uLjMzMzMzNzc3Nzc8PDw8PD4+Pj4+P8AAAAATGF2ZTU4LjEzAAAAAAAAAAAAAAAAJAQGAAAAAAAACs3yxUAAAAAAAAAAAAAAAAAAAAAA//sQZAAP8AAAaQAAAAgAAA0gAAABAAABpAAAACAAADSAAAAETEFNRTMuOTkuNVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/+xBkBY/wAABpAAAACAAADSAAAAEAAAGkAAAAIAAANIAAAARVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV';
+                audio.src = 'data:audio/mpeg;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAASAAAeMwAUFBQUFCgoKCgoKDw8PDw8PFBQUFBQUG5ubm5uboKCgoKCgpaWlpaWlqqqqqqqqr6+vr6+vtLS0tLS0ubm5ubm5vr6+vr6+v8AAAAATGF2YzU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAASAAAeMwAUFBQUFCgoKCgoKDw8PDw8PFBQUFBQUG5ubm5uboKCgoKCgpaWlpaWlqqqqqqqqr6+vr6+vtLS0tLS0ubm5ubm5vr6+vr6+v8AAAAATGF2YzU4LjEzAAAAAAAAAAAAAAAAJAQKAAAAAAAAHjOZTf9C//MsAAAAAAAAAAAAAAAAAAAA//tQZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAACzAAICAg4ODg4SEhISEhoaGhoaHh4eHh4iIiIiIiYmJiYmKioqKiouLi4uLjMzMzMzNzc3Nzc8PDw8PD4+Pj4+P8AAAAATGF2ZTU4LjEzAAAAAAAAAAAAAAAAJAQGAAAAAAAACs3yxUAAAAAAAAAAAAAAAAAAAAAA//sQZAAP8AAAaQAAAAgAAA0gAAABAAABpAAAACAAADSAAAAETEFNRTMuOTkuNVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV';
             } else if (preset === 'soft') {
-                audio.src = 'data:audio/mpeg;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAASAAAeMwAUFBQUFCgoKCgoKDw8PDw8PFBQUFBQUG5ubm5uboKCgoKCgpaWlpaWlqqqqqqqqr6+vr6+vtLS0tLS0ubm5ubm5vr6+vr6+v8AAAAATGF2YzU4LjEzAAAAAAAAAAAAAAAAJAQKAAAAAAAAHjOZTf9C//MsAAAAAAAAAAAAAAAAAAAA//tQZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAACzAAICAg4ODg4SEhISEhoaGhoaHh4eHh4iIiIiIiYmJiYmKioqKiouLi4uLjMzMzMzNzc3Nzc8PDw8PD4+Pj4+P8AAAAATGF2ZTU4LjEzAAAAAAAAAAAAAAAAJAQGAAAAAAAACs3yxUAAAAAAAAAAAAAAAAAAAAAA//sQZAAP8AAAaQAAAAgAAA0gAAABAAABpAAAACAAADSAAAAETEFNRTMuOTkuNVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/+xBkBY/wAABpAAAACAAADSAAAAEAAAGkAAAAIAAANIAAAARVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV';
+                audio.src = 'data:audio/mpeg;base64,SUQzBAAAAAAAI1RTU0UAAAAPAAADTGF2ZjU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAASAAAeMwAUFBQUFCgoKCgoKDw8PDw8PFBQUFBQUG5ubm5uboKCgoKCgpaWlpaWlqqqqqqqqr6+vr6+vtLS0tLS0ubm5ubm5vr6+vr6+v8AAAAATGF2YzU4Ljc2LjEwMAAAAAAAAAAAAAAA//tQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAASW5mbwAAAA8AAAASAAAeMwAUFBQUFCgoKCgoKDw8PDw8PFBQUFBQUG5ubm5uboKCgoKCgpaWlpaWlqqqqqqqqr6+vr6+vtLS0tLS0ubm5ubm5vr6+vr6+v8AAAAATGF2YzU4LjEzAAAAAAAAAAAAAAAAJAQKAAAAAAAAHjOZTf9C//MsAAAAAAAAAAAAAAAAAAAA//tQZAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAWGluZwAAAA8AAAACAAACzAAICAg4ODg4SEhISEhoaGhoaHh4eHh4iIiIiIiYmJiYmKioqKiouLi4uLjMzMzMzNzc3Nzc8PDw8PD4+Pj4+P8AAAAATGF2ZTU4LjEzAAAAAAAAAAAAAAAAJAQGAAAAAAAACs3yxUAAAAAAAAAAAAAAAAAAAAAA//sQZAAP8AAAaQAAAAgAAA0gAAABAAABpAAAACAAADSAAAAETEFNRTMuOTkuNVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVX/+xBkBY/wAABpAAAACAAADSAAAAEAAAGkAAAAIAAANIAAAARVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVVV';
             }
         }
         
