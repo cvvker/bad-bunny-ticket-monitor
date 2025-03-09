@@ -484,6 +484,162 @@ def check_ticketera_availability(event_url):
         logger.error(f"Error checking Ticketera: {e}")
         return "⚡ Error checking availability"
 
+async def add_to_cart(page, logger, event_url, browser_context, event_name, event_date, quantity=2):
+    """
+    Add tickets to cart for the given event and return the cart URL
+    """
+    success = False
+    cart_url = None
+    details = {}
+    
+    try:
+        logger.info(f"Starting to add to cart for event: {event_name}")
+        
+        # Navigate to the event page
+        logger.info(f"Navigating to event page: {event_url}")
+        await page.goto(event_url, wait_until="networkidle")
+        
+        # Wait a bit for page to fully load
+        await asyncio.sleep(2)
+        
+        # Take screenshot of the event page (for debugging)
+        screenshots_dir = os.path.join(os.path.dirname(__file__), "screenshots")
+        os.makedirs(screenshots_dir, exist_ok=True)
+        await page.screenshot(path=os.path.join(screenshots_dir, "event_page.png"))
+        
+        # Try to find and click the buy tickets button
+        buy_selectors = [
+            "a.btn-primary:has-text('Buy')",
+            "button:has-text('Buy')",
+            "a:has-text('Buy')",
+            "a:has-text('Purchase')",
+            "button:has-text('Purchase')"
+        ]
+        
+        for selector in buy_selectors:
+            if await page.query_selector(selector):
+                logger.info(f"Found buy button with selector: {selector}")
+                await page.click(selector)
+                await page.wait_for_load_state("networkidle")
+                await asyncio.sleep(2)
+                break
+        
+        # Try to select ticket quantity if possible
+        try:
+            logger.info("Attempting to select ticket quantity...")
+            quantity_selectors = [
+                "select#quantity", 
+                "select.quantity-select",
+                "select[name='quantity']", 
+                "select",
+                "input[type='number'][name='quantity']"
+            ]
+            
+            for selector in quantity_selectors:
+                quantity_input = await page.query_selector(selector)
+                if quantity_input:
+                    logger.info(f"Found quantity selector: {selector}")
+                    tag_name = await quantity_input.evaluate("el => el.tagName.toLowerCase()")
+                    
+                    if tag_name == "select":
+                        # For dropdown selector
+                        await page.select_option(selector, str(quantity))
+                    else:
+                        # For number input
+                        await page.fill(selector, str(quantity))
+                        
+                    logger.info(f"Selected {quantity} tickets")
+                    break
+        except Exception as e:
+            logger.warning(f"Could not select quantity: {e}")
+        
+        # Take screenshot after quantity selection (for debugging)
+        await page.screenshot(path=os.path.join(screenshots_dir, "after_quantity.png"))
+        
+        # Look for add to cart button and click it
+        add_cart_selectors = [
+            "button:has-text('Add to Cart')",
+            "button:has-text('Add')",
+            "input[value='Add to Cart']",
+            "button.add-to-cart",
+            "a:has-text('Add to Cart')",
+            "button:has-text('Cart')"
+        ]
+        
+        cart_clicked = False
+        for selector in add_cart_selectors:
+            if await page.query_selector(selector):
+                logger.info(f"Found add to cart button with selector: {selector}")
+                await page.click(selector)
+                await page.wait_for_load_state("networkidle")
+                await asyncio.sleep(3)
+                cart_clicked = True
+                
+                # Take screenshot after add to cart (for debugging)
+                await page.screenshot(path=os.path.join(screenshots_dir, "after_add_to_cart.png"))
+                break
+        
+        if not cart_clicked:
+            logger.warning("Could not find add to cart button")
+            # If we can't find an add to cart button, we might already be on a checkout page
+            # Check if the URL contains 'checkout'
+            if "checkout" in page.url:
+                cart_url = page.url
+                logger.info(f"Already on checkout page: {cart_url}")
+                cart_clicked = True
+            else:
+                return False, None, {}
+        
+        # Get the cart URL - it should now be in a format like:
+        # https://shop.ticketera.com/checkout/rock-of-ages-zmspx0 or 
+        # https://shop.ticketera.com/checkout/67be0fb1c3855d04ea54843e
+        cart_url = page.url
+        logger.info(f"Cart URL after adding tickets: {cart_url}")
+        
+        # Extract additional details about the tickets
+        
+        # Try to extract price
+        price = None
+        price_element = await page.query_selector("span.price, .amount, .total, .subtotal, span:has-text('$')")
+        if price_element:
+            price_text = await price_element.inner_text()
+            price_match = re.search(r'\$\s*(\d+(?:\.\d+)?)', price_text)
+            if price_match:
+                price = float(price_match.group(1))
+                logger.info(f"Found ticket price: ${price}")
+        
+        # Try to extract section
+        section = None
+        section_element = await page.query_selector(".section, .seat-info, .ticket-type")
+        if section_element:
+            section = await section_element.inner_text()
+            section = section.strip()
+            logger.info(f"Found section: {section}")
+        else:
+            section = "General Admission"
+        
+        # Check if the URL contains 'checkout' to verify it's a cart URL
+        if cart_url and "checkout" in cart_url:
+            success = True
+            details = {
+                'date': event_date,
+                'quantity': quantity,
+                'price': price,
+                'section': section,
+                'cart_url': cart_url
+            }
+            
+            # Take final screenshot (for debugging)
+            await page.screenshot(path=os.path.join(screenshots_dir, "final_checkout.png"))
+        else:
+            logger.warning(f"Cart URL doesn't appear to be a checkout URL: {cart_url}")
+    
+    except Exception as e:
+        logger.error(f"Error adding to cart: {str(e)}")
+        traceback.print_exc()
+    
+    return success, cart_url, details
+
 def check_with_playwright(event_url, attempt_carting=False, event_id=None):
     """Enhanced browser-based check with carting capability"""
     try:
@@ -1020,6 +1176,357 @@ def update_cart_result():
         'eventId': event_id,
         'status': status
     })
+
+@app.route('/api/tickets')
+def get_tickets():
+    """API endpoint to get ticket status"""
+    return jsonify(ticket_status)
+
+@app.route('/api/start-cart')
+def start_cart_api():
+    """API endpoint to start automatic carting with custom options"""
+    event_id = request.args.get('event_id')
+    url = request.args.get('url')
+    quantity = request.args.get('quantity', '2')
+    auto_checkout = request.args.get('auto_checkout', 'true').lower() == 'true'
+    best_available = request.args.get('best_available', 'true').lower() == 'true'
+    
+    if not event_id or not url:
+        return jsonify({'success': False, 'error': 'Missing required parameters'}), 400
+    
+    try:
+        # Convert quantity to integer
+        quantity = int(quantity)
+        if quantity < 1 or quantity > 8:
+            quantity = 2  # Default to 2 if out of range
+        
+        # Update cart options for this event
+        cart_options = {
+            'event_id': event_id,
+            'url': url,
+            'quantity': quantity,
+            'auto_checkout': auto_checkout,
+            'best_available': best_available,
+            'start_time': datetime.now().isoformat(),
+            'status': 'Initializing cart process',
+            'progress': 0
+        }
+        
+        # Store cart options
+        cart_session['activeCarts'][event_id] = cart_options
+        
+        # Get event details for notification
+        event_details = ticket_status.get(event_id, {})
+        event_name = event_details.get('name', f'Event {event_id}')
+        
+        # Send Discord notification about cart starting
+        notification_text = (
+            f"🛒 **Auto-Cart Started** 🛒\n"
+            f"Event: {event_name}\n"
+            f"Quantity: {quantity} ticket(s)\n"
+            f"Auto-Checkout: {'Enabled' if auto_checkout else 'Disabled'}\n"
+            f"Best Available: {'Enabled' if best_available else 'Disabled'}\n"
+            f"Started at: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
+        )
+        send_discord_notification(notification_text)
+        
+        # Start cart process in a background thread
+        thread = threading.Thread(
+            target=auto_cart_process,
+            args=(event_id, url, quantity, auto_checkout, best_available)
+        )
+        thread.daemon = True
+        thread.start()
+        
+        return jsonify({
+            'success': True, 
+            'message': f'Auto-cart started for {event_name}',
+            'options': cart_options
+        })
+        
+    except Exception as e:
+        logger.error(f"Error starting auto-cart: {e}")
+        return jsonify({'success': False, 'error': str(e)}), 500
+
+@app.route('/api/cart-status')
+def get_cart_status():
+    """API endpoint to get status of active cart processes"""
+    event_id = request.args.get('event_id')
+    
+    if event_id:
+        # Return status for specific event
+        active_cart = cart_session['activeCarts'].get(event_id)
+        completed_cart = cart_session['completedCarts'].get(event_id)
+        failed_cart = cart_session['failedCarts'].get(event_id)
+        
+        if active_cart:
+            return jsonify({
+                'status': active_cart.get('status', 'Processing...'),
+                'progress': active_cart.get('progress', 0),
+                'completed': False
+            })
+        elif completed_cart:
+            return jsonify({
+                'status': 'Cart process completed',
+                'progress': 100,
+                'completed': True,
+                'completion_time': completed_cart.get('completionTime')
+            })
+        elif failed_cart:
+            return jsonify({
+                'status': f'Failed: {failed_cart.get("reason", "Unknown error")}',
+                'progress': 0,
+                'completed': True,
+                'error': True
+            })
+        else:
+            return jsonify({'status': 'No cart process found for this event', 'progress': 0})
+    else:
+        # Return all cart statuses
+        return jsonify({
+            'active': cart_session['activeCarts'],
+            'completed': cart_session['completedCarts'],
+            'failed': cart_session['failedCarts']
+        })
+
+def auto_cart_process(event_id, url, quantity, auto_checkout, best_available):
+    """Background process to handle automated carting with options"""
+    try:
+        cart_session['activeCarts'][event_id]['status'] = 'Launching browser'
+        cart_session['activeCarts'][event_id]['progress'] = 5
+        
+        # Initialize browser for carting
+        browser = playwright.chromium.launch(headless=HEADLESS_MODE)
+        context = browser.new_context(
+            viewport={"width": 1920, "height": 1080},
+            user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+        )
+        page = context.new_page()
+        
+        # Navigate to ticket URL
+        cart_session['activeCarts'][event_id]['status'] = 'Opening ticket page'
+        cart_session['activeCarts'][event_id]['progress'] = 10
+        page.goto(url, wait_until="networkidle")
+        
+        # Step 1: Locate and click on the appropriate ticket buttons
+        cart_session['activeCarts'][event_id]['status'] = 'Looking for ticket options'
+        cart_session['activeCarts'][event_id]['progress'] = 20
+        
+        logger.info(f"Looking for ticket selection elements for {event_id}")
+        
+        # Wait for page to be fully loaded
+        page.wait_for_timeout(5000)
+        
+        # Take screenshot for debugging
+        page.screenshot(path=f"screenshots/ticket_page_initial.png")
+        
+        # Try to find and click best available if option is enabled
+        if best_available:
+            try:
+                cart_session['activeCarts'][event_id]['status'] = 'Selecting best available tickets'
+                cart_session['activeCarts'][event_id]['progress'] = 30
+                
+                # Look for best available button and click it
+                best_available_button = page.query_selector("button:has-text('Best Available')")
+                if best_available_button:
+                    best_available_button.click()
+                    page.wait_for_timeout(2000)
+                    logger.info("Clicked Best Available button")
+                else:
+                    logger.info("Best Available button not found, trying alternate methods")
+            except Exception as e:
+                logger.error(f"Error selecting best available: {e}")
+        
+        # Step 2: Set ticket quantity
+        try:
+            cart_session['activeCarts'][event_id]['status'] = f'Setting quantity to {quantity}'
+            cart_session['activeCarts'][event_id]['progress'] = 40
+            
+            # Look for quantity dropdown or selector
+            quantity_selector = page.query_selector("select.quantity-selector") or \
+                               page.query_selector("[aria-label='Quantity']") or \
+                               page.query_selector("select[name='quantity']")
+                               
+            if quantity_selector:
+                quantity_selector.select_option(str(quantity))
+                logger.info(f"Set quantity to {quantity}")
+            else:
+                logger.warning("Quantity selector not found, trying generic approach")
+                
+                # Try to find quantity buttons
+                for i in range(1, quantity):
+                    plus_button = page.query_selector("button:has-text('+')") or \
+                                  page.query_selector(".quantity-increment")
+                    if plus_button:
+                        plus_button.click()
+                        page.wait_for_timeout(500)
+            
+            page.wait_for_timeout(2000)
+            page.screenshot(path=f"screenshots/after_quantity_selection.png")
+            
+        except Exception as e:
+            logger.error(f"Error setting quantity: {e}")
+        
+        # Step 3: Add to cart
+        try:
+            cart_session['activeCarts'][event_id]['status'] = 'Adding to cart'
+            cart_session['activeCarts'][event_id]['progress'] = 60
+            
+            # Look for add to cart button with various selectors
+            add_to_cart_button = page.query_selector("button:has-text('Add to Cart')") or \
+                                page.query_selector("button:has-text('Añadir')") or \
+                                page.query_selector("button.add-to-cart") or \
+                                page.query_selector("[data-testid='add-to-cart']")
+                                
+            if add_to_cart_button:
+                add_to_cart_button.click()
+                logger.info("Clicked Add to Cart button")
+                page.wait_for_timeout(3000)
+                page.screenshot(path=f"screenshots/after_add_to_cart.png")
+                
+                # Step 4: Proceed to checkout if auto-checkout is enabled
+                if auto_checkout:
+                    cart_session['activeCarts'][event_id]['status'] = 'Proceeding to checkout'
+                    cart_session['activeCarts'][event_id]['progress'] = 80
+                    
+                    # Look for checkout button
+                    checkout_button = page.query_selector("a:has-text('Checkout')") or \
+                                     page.query_selector("button:has-text('Checkout')") or \
+                                     page.query_selector("a:has-text('Proceed to Checkout')") or \
+                                     page.query_selector("a.checkout-button")
+                                     
+                    if checkout_button:
+                        checkout_button.click()
+                        logger.info("Clicked Checkout button")
+                        page.wait_for_timeout(5000)
+                        page.screenshot(path=f"screenshots/checkout_final.png")
+                        
+                        cart_session['activeCarts'][event_id]['status'] = 'At checkout page'
+                        cart_session['activeCarts'][event_id]['progress'] = 100
+                        
+                        # Record completion
+                        cart_session['completedCarts'][event_id] = {
+                            'completionTime': datetime.now().isoformat(),
+                            'url': page.url
+                        }
+                        
+                        # Remove from active carts
+                        if event_id in cart_session['activeCarts']:
+                            del cart_session['activeCarts'][event_id]
+                        
+                        # Send success notification
+                        notification_text = (
+                            f"✅ **Auto-Cart Completed** ✅\n"
+                            f"Event: {ticket_status.get(event_id, {}).get('name', event_id)}\n"
+                            f"Quantity: {quantity} ticket(s)\n"
+                            f"Status: At checkout page\n"
+                            f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+                            f"**GO COMPLETE YOUR PURCHASE NOW!**"
+                        )
+                        send_discord_notification(notification_text, use_mentions=True)
+                        
+                    else:
+                        logger.error("Checkout button not found")
+                        
+                        # Record failure
+                        cart_session['failedCarts'][event_id] = {
+                            'failedTime': datetime.now().isoformat(),
+                            'reason': "Checkout button not found"
+                        }
+                        
+                        # Send failure notification
+                        notification_text = (
+                            f"❌ **Auto-Cart Partial Success** ❌\n"
+                            f"Event: {ticket_status.get(event_id, {}).get('name', event_id)}\n"
+                            f"Status: Added to cart but couldn't proceed to checkout\n"
+                            f"URL: {page.url}"
+                        )
+                        send_discord_notification(notification_text)
+                else:
+                    # Auto-checkout not enabled, so we're done after adding to cart
+                    cart_session['activeCarts'][event_id]['status'] = 'Added to cart'
+                    cart_session['activeCarts'][event_id]['progress'] = 100
+                    
+                    # Record completion
+                    cart_session['completedCarts'][event_id] = {
+                        'completionTime': datetime.now().isoformat(),
+                        'url': page.url
+                    }
+                    
+                    # Remove from active carts
+                    if event_id in cart_session['activeCarts']:
+                        del cart_session['activeCarts'][event_id]
+                    
+                    # Send success notification
+                    notification_text = (
+                        f"✅ **Added to Cart** ✅\n"
+                        f"Event: {ticket_status.get(event_id, {}).get('name', event_id)}\n"
+                        f"Quantity: {quantity} ticket(s)\n"
+                        f"Time: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n\n"
+                        f"**Note:** Auto-checkout was disabled. Complete your purchase manually."
+                    )
+                    send_discord_notification(notification_text)
+            else:
+                logger.error("Add to cart button not found")
+                
+                # Record failure
+                cart_session['failedCarts'][event_id] = {
+                    'failedTime': datetime.now().isoformat(),
+                    'reason': "Add to cart button not found"
+                }
+                
+                # Send failure notification
+                notification_text = (
+                    f"❌ **Auto-Cart Failed** ❌\n"
+                    f"Event: {ticket_status.get(event_id, {}).get('name', event_id)}\n"
+                    f"Reason: Add to cart button not found\n"
+                    f"URL: {page.url}"
+                )
+                send_discord_notification(notification_text)
+        except Exception as e:
+            logger.error(f"Error during auto-cart: {e}")
+            
+            # Record failure
+            cart_session['failedCarts'][event_id] = {
+                'failedTime': datetime.now().isoformat(),
+                'reason': str(e)
+            }
+            
+            # Remove from active carts
+            if event_id in cart_session['activeCarts']:
+                del cart_session['activeCarts'][event_id]
+            
+            # Send failure notification
+            notification_text = (
+                f"❌ **Auto-Cart Error** ❌\n"
+                f"Event: {ticket_status.get(event_id, {}).get('name', event_id)}\n"
+                f"Error: {str(e)}"
+            )
+            send_discord_notification(notification_text)
+            
+        # Close browser
+        browser.close()
+        
+    except Exception as e:
+        logger.error(f"Global error in auto-cart process: {e}")
+        
+        # Record failure
+        cart_session['failedCarts'][event_id] = {
+            'failedTime': datetime.now().isoformat(),
+            'reason': str(e)
+        }
+        
+        # Remove from active carts
+        if event_id in cart_session['activeCarts']:
+            del cart_session['activeCarts'][event_id]
+        
+        # Send failure notification
+        notification_text = (
+            f"❌ **Auto-Cart System Error** ❌\n"
+            f"Event: {ticket_status.get(event_id, {}).get('name', event_id)}\n"
+            f"System Error: {str(e)}"
+        )
+        send_discord_notification(notification_text)
 
 if __name__ == '__main__':
     # Do initial check
