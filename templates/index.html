@@ -9,7 +9,9 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/checkout.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/autofill.css') }}">
     <script src="{{ url_for('static', filename='js/checkout.js') }}" defer></script>
+    <script src="{{ url_for('static', filename='js/autofill.js') }}" defer></script>
     <style>
         :root {
             --dark-bg: #121212;
@@ -258,6 +260,79 @@
                 <div class="mt-3">
                     <button class="btn btn-success" onclick="saveCustomSound()">Save Sound Preference</button>
                     <button class="btn btn-sm btn-outline-light ms-2" onclick="testSound()">Test Sound</button>
+                </div>
+            </div>
+            
+            <!-- Autofill Settings Button -->
+            <div class="mb-4 text-center">
+                <button class="btn btn-outline-light" onclick="toggleAutofillSettings()">
+                    <i class="fas fa-id-card"></i> Checkout Autofill Settings
+                </button>
+            </div>
+            
+            <!-- Autofill Settings Form -->
+            <div id="autofill-settings-container" class="autofill-container">
+                <h3><i class="fas fa-id-card"></i> Checkout Autofill Settings</h3>
+                <p class="text-muted mb-3">Enter your information below to automatically fill checkout forms when tickets become available.</p>
+                
+                <form id="autofill-settings-form" class="autofill-form">
+                    <div class="form-row">
+                        <div class="col-6 form-group">
+                            <label for="autofill-firstname">First Name</label>
+                            <input type="text" id="autofill-firstname" class="form-control" placeholder="First name">
+                        </div>
+                        <div class="col-6 form-group">
+                            <label for="autofill-lastname">Last Name</label>
+                            <input type="text" id="autofill-lastname" class="form-control" placeholder="Last name">
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="autofill-email">Email Address</label>
+                        <input type="email" id="autofill-email" class="form-control" placeholder="email@example.com">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="autofill-phone">Phone Number</label>
+                        <input type="tel" id="autofill-phone" class="form-control" placeholder="Phone number">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="autofill-street">Street Address</label>
+                        <input type="text" id="autofill-street" class="form-control" placeholder="Street address">
+                    </div>
+                    
+                    <div class="form-row">
+                        <div class="col-6 form-group">
+                            <label for="autofill-city">City</label>
+                            <input type="text" id="autofill-city" class="form-control" placeholder="City">
+                        </div>
+                        <div class="col-4 form-group">
+                            <label for="autofill-state">State</label>
+                            <input type="text" id="autofill-state" class="form-control" placeholder="State">
+                        </div>
+                        <div class="col-6 form-group">
+                            <label for="autofill-zip">ZIP Code</label>
+                            <input type="text" id="autofill-zip" class="form-control" placeholder="ZIP code">
+                        </div>
+                    </div>
+                    
+                    <div class="autofill-actions">
+                        <button type="button" id="save-autofill-settings" class="btn btn-primary">
+                            <i class="fas fa-save"></i> Save Information
+                        </button>
+                    </div>
+                </form>
+                
+                <div class="bookmarklet-container mt-4">
+                    <h4>Instant Autofill Bookmarklet</h4>
+                    <p>Drag this button to your bookmarks bar for one-click form filling:</p>
+                    <a id="autofill-bookmarklet" href="#" class="bookmarklet-link">
+                        <i class="fas fa-magic"></i> Autofill Ticketera
+                    </a>
+                    <div class="bookmarklet-instructions mt-2">
+                        <p><small>When on the Ticketera checkout page, click this bookmark to automatically fill your information.</small></p>
+                    </div>
                 </div>
             </div>
             
@@ -834,6 +909,11 @@
                     }
                 });
             }
+        }
+        
+        function toggleAutofillSettings() {
+            const container = document.getElementById('autofill-settings-container');
+            container.classList.toggle('visible');
         }
     </script>
 </body>

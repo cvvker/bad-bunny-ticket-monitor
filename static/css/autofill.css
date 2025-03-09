@@ -1,0 +1,114 @@
+/* Autofill feature styling */
+
+.autofill-container {
+    background-color: var(--card-bg);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 20px;
+    margin-bottom: 30px;
+    display: none; /* Hidden by default */
+}
+
+.autofill-container.visible {
+    display: block;
+}
+
+.autofill-container h3 {
+    color: var(--text-color);
+    margin-bottom: 15px;
+    border-bottom: 1px solid var(--border-color);
+    padding-bottom: 10px;
+}
+
+.autofill-form .form-group {
+    margin-bottom: 15px;
+}
+
+.autofill-form label {
+    display: block;
+    margin-bottom: 5px;
+    color: var(--text-color);
+    font-weight: bold;
+}
+
+.autofill-form input {
+    width: 100%;
+    padding: 8px 12px;
+    border: 1px solid var(--border-color);
+    border-radius: 5px;
+    background-color: var(--input-bg);
+    color: var(--text-color);
+}
+
+.autofill-form input:focus {
+    outline: none;
+    border-color: #007bff;
+    box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+}
+
+.autofill-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 15px;
+}
+
+.bookmarklet-container {
+    margin-top: 20px;
+    padding: 15px;
+    background-color: rgba(255, 255, 255, 0.1);
+    border-radius: 8px;
+}
+
+.bookmarklet-container p {
+    margin-bottom: 10px;
+}
+
+.bookmarklet-link {
+    display: inline-block;
+    padding: 8px 15px;
+    background-color: #343a40;
+    color: white;
+    text-decoration: none;
+    border-radius: 5px;
+    cursor: move;
+    border: 1px solid #6c757d;
+}
+
+.bookmarklet-link:hover {
+    background-color: #23272b;
+}
+
+.bookmarklet-instructions {
+    font-size: 0.9em;
+    margin-top: 10px;
+    color: #adb5bd;
+}
+
+/* Form grid for addressing info */
+.form-row {
+    display: flex;
+    flex-wrap: wrap;
+    margin-right: -5px;
+    margin-left: -5px;
+}
+
+.form-row > div {
+    padding-left: 5px;
+    padding-right: 5px;
+}
+
+.col-6 {
+    flex: 0 0 50%;
+    max-width: 50%;
+}
+
+.col-4 {
+    flex: 0 0 33.333333%;
+    max-width: 33.333333%;
+}
+
+.col-8 {
+    flex: 0 0 66.666667%;
+    max-width: 66.666667%;
+}
