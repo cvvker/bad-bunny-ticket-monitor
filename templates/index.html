@@ -279,47 +279,47 @@
                     <div class="form-row">
                         <div class="col-6 form-group">
                             <label for="autofill-firstname">First Name</label>
-                            <input type="text" id="autofill-firstname" class="form-control" placeholder="First name">
+                            <input type="text" id="autofill-firstname" class="form-control" placeholder="First name" readonly>
                         </div>
                         <div class="col-6 form-group">
                             <label for="autofill-lastname">Last Name</label>
-                            <input type="text" id="autofill-lastname" class="form-control" placeholder="Last name">
+                            <input type="text" id="autofill-lastname" class="form-control" placeholder="Last name" readonly>
                         </div>
                     </div>
                     
                     <div class="form-group">
-                        <label for="autofill-email">Email Address</label>
+                        <label for="autofill-email">Email Address <small class="text-warning">(Add your email)</small></label>
                         <input type="email" id="autofill-email" class="form-control" placeholder="email@example.com">
                     </div>
                     
                     <div class="form-group">
                         <label for="autofill-phone">Phone Number</label>
-                        <input type="tel" id="autofill-phone" class="form-control" placeholder="Phone number">
+                        <input type="tel" id="autofill-phone" class="form-control" placeholder="Phone number" readonly>
                     </div>
                     
                     <div class="form-group">
                         <label for="autofill-street">Street Address</label>
-                        <input type="text" id="autofill-street" class="form-control" placeholder="Street address">
+                        <input type="text" id="autofill-street" class="form-control" placeholder="Street address" readonly>
                     </div>
                     
                     <div class="form-row">
                         <div class="col-6 form-group">
                             <label for="autofill-city">City</label>
-                            <input type="text" id="autofill-city" class="form-control" placeholder="City">
+                            <input type="text" id="autofill-city" class="form-control" placeholder="City" readonly>
                         </div>
                         <div class="col-4 form-group">
                             <label for="autofill-state">State</label>
-                            <input type="text" id="autofill-state" class="form-control" placeholder="State">
+                            <input type="text" id="autofill-state" class="form-control" placeholder="State" readonly>
                         </div>
                         <div class="col-6 form-group">
                             <label for="autofill-zip">ZIP Code</label>
-                            <input type="text" id="autofill-zip" class="form-control" placeholder="ZIP code">
+                            <input type="text" id="autofill-zip" class="form-control" placeholder="ZIP code" readonly>
                         </div>
                     </div>
                     
                     <div class="autofill-actions">
-                        <button type="button" id="save-autofill-settings" class="btn btn-primary">
-                            <i class="fas fa-save"></i> Save Information
+                        <button type="button" id="generate-autofill" class="btn btn-primary">
+                            <i class="fas fa-dice"></i> Generate New Random Info
                         </button>
                     </div>
                 </form>
@@ -331,7 +331,26 @@
                         <i class="fas fa-magic"></i> Autofill Ticketera
                     </a>
                     <div class="bookmarklet-instructions mt-2">
-                        <p><small>When on the Ticketera checkout page, click this bookmark to automatically fill your information.</small></p>
+                        <ul class="small">
+                            <li><strong>RIGHT-CLICK</strong> the button above and select "<strong>Add to bookmarks</strong>" (Don't drag)</li>
+                            <li>When on a Ticketera checkout page, click this bookmark</li>
+                            <li>Email field will be left blank for you to fill in</li>
+                            <li>If the bookmark doesn't work, try opening the browser console (F12) to see any errors</li>
+                            <li>Some checkout forms may use security measures that prevent autofill</li>
+                        </ul>
+                    </div>
+                    
+                    <div class="alternate-method mt-3 p-3 border rounded bg-light">
+                        <h5>Alternative Method (Copy-Paste)</h5>
+                        <p class="small">If the bookmark doesn't work, try this method:</p>
+                        <ol class="small">
+                            <li>Click the button below to copy an autofill script</li>
+                            <li>On the checkout page, press F12 to open browser console</li>
+                            <li>Paste the script into the console and press Enter</li>
+                        </ol>
+                        <button id="copy-autofill-script" class="btn btn-sm btn-secondary">
+                            <i class="fas fa-copy"></i> Copy Autofill Script
+                        </button>
                     </div>
                 </div>
             </div>
@@ -914,7 +933,116 @@
         function toggleAutofillSettings() {
             const container = document.getElementById('autofill-settings-container');
             container.classList.toggle('visible');
+            
+            // Force initialize autofill settings when opening
+            if (container.classList.contains('visible')) {
+                setTimeout(() => {
+                    // Check if autofill is already initialized
+                    if (!document.getElementById('random-autofill-settings')) {
+                        initAutofillSettings();
+                    }
+                }, 100);
+            }
         }
+    </script>
+    <script>
+        // Initialize autofill as soon as the page loads
+        window.onload = function() {
+            console.log("Window loaded - initializing autofill");
+            // Generate random info immediately if the form exists
+            setTimeout(() => {
+                const form = document.getElementById('autofill-settings-form');
+                if (form) {
+                    console.log("Found autofill form - generating random info");
+                    // Check if the userInfo function exists in the autofill.js
+                    if (typeof generateRandomUserInfo === 'function') {
+                        // Generate random info
+                        const userInfo = generateRandomUserInfo();
+                        console.log("Generated random user info:", userInfo);
+                        
+                        // Fill the form fields
+                        document.getElementById('autofill-firstname').value = userInfo.firstName;
+                        document.getElementById('autofill-lastname').value = userInfo.lastName;
+                        document.getElementById('autofill-phone').value = userInfo.phone;
+                        document.getElementById('autofill-street').value = userInfo.address.street;
+                        document.getElementById('autofill-city').value = userInfo.address.city;
+                        document.getElementById('autofill-state').value = userInfo.address.state;
+                        document.getElementById('autofill-zip').value = userInfo.address.zip;
+                        
+                        // Save to localStorage
+                        localStorage.setItem('ticketeraUserInfo', JSON.stringify(userInfo));
+                        
+                        console.log("Random info populated and saved to localStorage");
+                    } else {
+                        console.error("generateRandomUserInfo function not found");
+                    }
+                } else {
+                    console.log("Autofill form not found after window load");
+                }
+            }, 1000);
+        };
+    </script>
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Set up the copy button
+            const copyButton = document.getElementById('copy-autofill-script');
+            if (copyButton) {
+                copyButton.addEventListener('click', function() {
+                    const userInfo = {
+                        firstName: document.getElementById('autofill-firstname').value,
+                        lastName: document.getElementById('autofill-lastname').value,
+                        phone: document.getElementById('autofill-phone').value,
+                        address: {
+                            street: document.getElementById('autofill-street').value,
+                            city: document.getElementById('autofill-city').value,
+                            state: document.getElementById('autofill-state').value,
+                            zip: document.getElementById('autofill-zip').value
+                        }
+                    };
+                    
+                    const script = `
+(function() {
+    const userInfo = ${JSON.stringify(userInfo)};
+    
+    // Fill all input fields
+    document.querySelectorAll('input:not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="checkbox"]):not([type="radio"])').forEach(input => {
+        const name = (input.name || '').toLowerCase();
+        const id = (input.id || '').toLowerCase();
+        const placeholder = (input.placeholder || '').toLowerCase();
+        
+        if (input.value) return; // Skip already filled fields
+        
+        if (name.includes('first') || name.includes('nombre') || id.includes('first') || placeholder.includes('first name')) {
+            input.value = userInfo.firstName;
+        } else if (name.includes('last') || name.includes('apellido') || id.includes('last') || placeholder.includes('last name')) {
+            input.value = userInfo.lastName;
+        } else if (name.includes('phone') || name.includes('tel') || id.includes('phone') || placeholder.includes('phone')) {
+            input.value = userInfo.phone;
+        } else if (name.includes('address') || name.includes('street') || id.includes('address') || placeholder.includes('address')) {
+            input.value = userInfo.address.street;
+        } else if (name.includes('city') || id.includes('city') || placeholder.includes('city')) {
+            input.value = userInfo.address.city;
+        } else if (name.includes('state') || id.includes('state') || placeholder.includes('state')) {
+            input.value = userInfo.address.state;
+        } else if (name.includes('zip') || name.includes('postal') || id.includes('zip') || placeholder.includes('zip')) {
+            input.value = userInfo.address.zip;
+        }
+        
+        if (input.value) {
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+            input.dispatchEvent(new Event('change', { bubbles: true }));
+        }
+    });
+    
+    alert('Form autofilled! Remember to add your email address.');
+})();`;
+                    
+                    navigator.clipboard.writeText(script)
+                        .then(() => alert('Autofill script copied! Paste it into the browser console on the checkout page.'))
+                        .catch(err => alert('Error copying script: ' + err));
+                });
+            }
+        });
     </script>
 </body>
 </html>

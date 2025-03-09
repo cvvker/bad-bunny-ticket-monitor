@@ -1,21 +1,7 @@
 /**
  * Ticketera Checkout Form Autofill
- * This script automatically fills checkout form fields when a checkout page is detected
+ * This script provides a bookmarklet for auto-filling checkout forms
  */
-
-// Saved user information (will be stored in localStorage)
-let userInfo = {
-    firstName: "",
-    lastName: "",
-    email: "",
-    phone: "",
-    address: {
-        street: "",
-        city: "",
-        state: "",
-        zip: ""
-    }
-};
 
 // Sample data for random generation
 const sampleData = {
@@ -37,265 +23,246 @@ function generateRandomPhone() {
     return `${areaCode}-${middle}-${end}`;
 }
 
-// Generate random data for everything except email
+// Generate random user info object
 function generateRandomUserInfo() {
     const getRandomItem = arr => arr[Math.floor(Math.random() * arr.length)];
     
-    userInfo.firstName = getRandomItem(sampleData.firstNames);
-    userInfo.lastName = getRandomItem(sampleData.lastNames);
-    userInfo.phone = generateRandomPhone();
-    userInfo.address.street = `${getRandomItem(sampleData.streetNumbers)} ${getRandomItem(sampleData.streets)}`;
-    userInfo.address.city = getRandomItem(sampleData.cities);
-    userInfo.address.state = getRandomItem(sampleData.states);
-    userInfo.address.zip = getRandomItem(sampleData.zipCodes);
-    
-    // Email is intentionally left blank for the user to fill in
-    userInfo.email = "";
-    
-    return userInfo;
+    return {
+        firstName: getRandomItem(sampleData.firstNames),
+        lastName: getRandomItem(sampleData.lastNames),
+        email: "", // Intentionally left blank
+        phone: generateRandomPhone(),
+        address: {
+            street: `${getRandomItem(sampleData.streetNumbers)} ${getRandomItem(sampleData.streets)}`,
+            city: getRandomItem(sampleData.cities),
+            state: getRandomItem(sampleData.states),
+            zip: getRandomItem(sampleData.zipCodes)
+        }
+    };
 }
 
-// Load saved info from localStorage
-function loadSavedInfo() {
-    const savedInfo = localStorage.getItem('ticketeraUserInfo');
-    if (savedInfo) {
+// Generate bookmarklet code - UPDATED VERSION with more robust selectors
+function generateBookmarkletCode(userInfo) {
+    const code = `
+    (function() {
         try {
-            userInfo = JSON.parse(savedInfo);
-            return true;
-        } catch (e) {
-            console.error("Error loading saved user info:", e);
-            return false;
-        }
-    }
-    return false;
-}
-
-// Save user info to localStorage
-function saveUserInfo() {
-    localStorage.setItem('ticketeraUserInfo', JSON.stringify(userInfo));
-}
-
-// Get form fields from the settings form
-function getUserInfoFromForm() {
-    const form = document.getElementById('autofill-settings-form');
-    if (!form) return false;
-    
-    userInfo.firstName = form.querySelector('#autofill-firstname').value;
-    userInfo.lastName = form.querySelector('#autofill-lastname').value;
-    userInfo.email = form.querySelector('#autofill-email').value;
-    userInfo.phone = form.querySelector('#autofill-phone').value;
-    userInfo.address.street = form.querySelector('#autofill-street').value;
-    userInfo.address.city = form.querySelector('#autofill-city').value;
-    userInfo.address.state = form.querySelector('#autofill-state').value;
-    userInfo.address.zip = form.querySelector('#autofill-zip').value;
-    
-    // Save to localStorage
-    saveUserInfo();
-    return true;
-}
-
-// Apply autofill to checkout page
-function autofillCheckoutPage() {
-    // This function will be injected into the checkout page via a content script approach
-    // First, ensure we have user data
-    if (loadSavedInfo()) {
-        // Store fields to fill with corresponding values
-        const fieldsToFill = {
-            'input[name*="first"i]:not([type="hidden"])': userInfo.firstName,
-            'input[name*="last"i]:not([type="hidden"])': userInfo.lastName,
-            'input[type="email"]:not([name*="repeat"i]):not([name*="confirm"i])': userInfo.email,
-            'input[name*="repeat"i][type="email"], input[name*="confirm"i][type="email"]': userInfo.email,
-            'input[name*="phone"i]:not([type="hidden"])': userInfo.phone,
-            'input[name*="street"i]:not([type="hidden"]), input[name*="address"i]:not([type="hidden"])': userInfo.address.street,
-            'input[name*="city"i]:not([type="hidden"])': userInfo.address.city,
-            'input[name*="state"i]:not([type="hidden"]), select[name*="state"i]': userInfo.address.state,
-            'input[name*="zip"i]:not([type="hidden"]), input[name*="postal"i]:not([type="hidden"])': userInfo.address.zip
-        };
-        
-        // Fill each matching field
-        for (const selector in fieldsToFill) {
-            const elements = document.querySelectorAll(selector);
-            const value = fieldsToFill[selector];
-            
-            elements.forEach(element => {
-                if (element.tagName === 'SELECT') {
-                    // Handle dropdown select elements
-                    const options = element.querySelectorAll('option');
-                    for (const option of options) {
-                        if (option.text.toLowerCase().includes(value.toLowerCase())) {
-                            option.selected = true;
-                            break;
-                        }
-                    }
-                    // Trigger change event
-                    element.dispatchEvent(new Event('change', { bubbles: true }));
-                } else {
-                    // Handle input elements
-                    element.value = value;
-                    // Trigger input and change events to activate any form validation
-                    element.dispatchEvent(new Event('input', { bubbles: true }));
-                    element.dispatchEvent(new Event('change', { bubbles: true }));
-                }
-            });
-        }
-        
-        return true;
-    }
-    return false;
-}
-
-// Function to create a bookmarklet for manual autofill
-function generateAutofillBookmarklet() {
-    // Load the latest user data
-    loadSavedInfo();
-    
-    // Create the JavaScript code that will be executed by the bookmarklet
-    const bookmarkletCode = `
-        (function() {
+            console.log("Autofill bookmarklet started");
             const userInfo = ${JSON.stringify(userInfo)};
             
-            // Store fields to fill with corresponding values
+            // More comprehensive set of selectors for form fields
             const fieldsToFill = {
-                'input[name*="first"i]:not([type="hidden"])': userInfo.firstName,
-                'input[name*="last"i]:not([type="hidden"])': userInfo.lastName,
-                'input[type="email"]:not([name*="repeat"i]):not([name*="confirm"i])': userInfo.email,
-                'input[name*="repeat"i][type="email"], input[name*="confirm"i][type="email"]': userInfo.email,
-                'input[name*="phone"i]:not([type="hidden"])': userInfo.phone,
-                'input[name*="street"i]:not([type="hidden"]), input[name*="address"i]:not([type="hidden"])': userInfo.address.street,
-                'input[name*="city"i]:not([type="hidden"])': userInfo.address.city,
-                'input[name*="state"i]:not([type="hidden"]), select[name*="state"i]': userInfo.address.state,
-                'input[name*="zip"i]:not([type="hidden"]), input[name*="postal"i]:not([type="hidden"])': userInfo.address.zip
+                // First name - try multiple variations
+                'input[name*="first"i]:not([type="hidden"]), input[name*="nombre"i]:not([type="hidden"]), input#firstname, input#firstName, input#first_name, input[placeholder*="first"i], input[placeholder*="nombre"i]': userInfo.firstName,
+                
+                // Last name - try multiple variations
+                'input[name*="last"i]:not([type="hidden"]), input[name*="apellido"i]:not([type="hidden"]), input#lastname, input#lastName, input#last_name, input[placeholder*="last"i], input[placeholder*="apellido"i]': userInfo.lastName,
+                
+                // Phone
+                'input[name*="phone"i]:not([type="hidden"]), input[name*="telefono"i]:not([type="hidden"]), input#phone, input#phoneNumber, input[placeholder*="phone"i], input[placeholder*="telefono"i], input[type="tel"]': userInfo.phone,
+                
+                // Address/Street
+                'input[name*="street"i]:not([type="hidden"]), input[name*="address"i]:not([type="hidden"]), input[name*="direccion"i]:not([type="hidden"]), input#street, input#address, input[placeholder*="street"i], input[placeholder*="address"i], input[placeholder*="direccion"i]': userInfo.address.street,
+                
+                // City
+                'input[name*="city"i]:not([type="hidden"]), input[name*="ciudad"i]:not([type="hidden"]), input#city, input[placeholder*="city"i], input[placeholder*="ciudad"i]': userInfo.address.city,
+                
+                // State
+                'input[name*="state"i]:not([type="hidden"]), input[name*="estado"i]:not([type="hidden"]), select[name*="state"i], select[name*="estado"i], input#state, select#state, select#estado': userInfo.address.state,
+                
+                // Zip code
+                'input[name*="zip"i]:not([type="hidden"]), input[name*="postal"i]:not([type="hidden"]), input[name*="codigo"i]:not([type="hidden"]), input#zipcode, input#zip, input#postal, input#postalCode, input[placeholder*="zip"i], input[placeholder*="postal"i]': userInfo.address.zip
             };
             
-            // Fill each matching field
+            console.log("Attempting to fill fields with:", userInfo);
+            
+            // Count of fields found
+            let fieldsFound = 0;
+            
+            // Fill fields
             for (const selector in fieldsToFill) {
                 const elements = document.querySelectorAll(selector);
                 const value = fieldsToFill[selector];
                 
+                console.log(\`Found \${elements.length} elements matching selector: \${selector}\`);
+                
                 elements.forEach(element => {
-                    if (element.tagName === 'SELECT') {
-                        // Handle dropdown select elements
-                        const options = element.querySelectorAll('option');
-                        for (const option of options) {
-                            if (option.text.toLowerCase().includes(value.toLowerCase())) {
-                                option.selected = true;
-                                break;
+                    try {
+                        fieldsFound++;
+                        if (element.tagName === 'SELECT') {
+                            // Handle dropdown select elements
+                            const options = element.querySelectorAll('option');
+                            for (const option of options) {
+                                if (option.text.toLowerCase().includes(value.toLowerCase())) {
+                                    option.selected = true;
+                                    break;
+                                }
                             }
+                            element.dispatchEvent(new Event('change', { bubbles: true }));
+                        } else {
+                            // Handle input elements
+                            element.value = value;
+                            element.dispatchEvent(new Event('input', { bubbles: true }));
+                            element.dispatchEvent(new Event('change', { bubbles: true }));
                         }
-                        // Trigger change event
-                        element.dispatchEvent(new Event('change', { bubbles: true }));
-                    } else {
-                        // Handle input elements
-                        element.value = value;
-                        // Trigger input and change events to activate any form validation
-                        element.dispatchEvent(new Event('input', { bubbles: true }));
-                        element.dispatchEvent(new Event('change', { bubbles: true }));
+                        console.log(\`Successfully filled field: \${element.name || element.id || 'unnamed'} with value: \${value}\`);
+                    } catch (fieldError) {
+                        console.error("Error filling field:", fieldError);
                     }
                 });
             }
             
-            alert('Form autofilled successfully!');
-        })();
+            // Try a different approach for fields that might be in iframes or have unusual structures
+            setTimeout(function() {
+                // Get all input elements
+                const allInputs = document.querySelectorAll('input:not([type="hidden"]):not([type="submit"]):not([type="button"]):not([type="checkbox"]):not([type="radio"])');
+                
+                allInputs.forEach(input => {
+                    const name = (input.name || '').toLowerCase();
+                    const id = (input.id || '').toLowerCase();
+                    const placeholder = (input.placeholder || '').toLowerCase();
+                    const type = (input.type || '').toLowerCase();
+                    
+                    // Skip if already filled
+                    if (input.value) return;
+                    
+                    try {
+                        // First name
+                        if (name.includes('first') || name.includes('nombre') || id.includes('first') || id.includes('nombre') || 
+                            placeholder.includes('first') || placeholder.includes('nombre')) {
+                            input.value = userInfo.firstName;
+                        }
+                        // Last name
+                        else if (name.includes('last') || name.includes('apellido') || id.includes('last') || id.includes('apellido') || 
+                                placeholder.includes('last') || placeholder.includes('apellido')) {
+                            input.value = userInfo.lastName;
+                        }
+                        // Phone
+                        else if (name.includes('phone') || name.includes('telefono') || id.includes('phone') || id.includes('telefono') || 
+                                placeholder.includes('phone') || placeholder.includes('telefono') || type === 'tel') {
+                            input.value = userInfo.phone;
+                        }
+                        // Street
+                        else if (name.includes('street') || name.includes('address') || name.includes('direccion') || 
+                                id.includes('street') || id.includes('address') || id.includes('direccion') || 
+                                placeholder.includes('street') || placeholder.includes('address') || placeholder.includes('direccion')) {
+                            input.value = userInfo.address.street;
+                        }
+                        // City
+                        else if (name.includes('city') || name.includes('ciudad') || id.includes('city') || id.includes('ciudad') || 
+                                placeholder.includes('city') || placeholder.includes('ciudad')) {
+                            input.value = userInfo.address.city;
+                        }
+                        // State
+                        else if (name.includes('state') || name.includes('estado') || id.includes('state') || id.includes('estado') || 
+                                placeholder.includes('state') || placeholder.includes('estado')) {
+                            input.value = userInfo.address.state;
+                        }
+                        // Zip
+                        else if (name.includes('zip') || name.includes('postal') || name.includes('codigo') || 
+                                id.includes('zip') || id.includes('postal') || id.includes('codigo') || 
+                                placeholder.includes('zip') || placeholder.includes('postal') || placeholder.includes('codigo')) {
+                            input.value = userInfo.address.zip;
+                        }
+                        
+                        // Dispatch events
+                        if (input.value) {
+                            input.dispatchEvent(new Event('input', { bubbles: true }));
+                            input.dispatchEvent(new Event('change', { bubbles: true }));
+                            fieldsFound++;
+                        }
+                    } catch (fallbackError) {
+                        console.error("Error in fallback approach:", fallbackError);
+                    }
+                });
+                
+                if (fieldsFound > 0) {
+                    alert(\`Form autofilled with \${fieldsFound} fields! Email field left blank for your list.\`);
+                } else {
+                    alert("No form fields were found to autofill. Please check if you're on a checkout page.");
+                }
+            }, 500);
+            
+        } catch (error) {
+            console.error("Autofill bookmarklet error:", error);
+            alert("Error running autofill: " + error.message);
+        }
+    })();
     `;
     
-    // Encode the code for a bookmarklet
-    const encodedCode = encodeURIComponent(bookmarkletCode.replace(/\s+/g, ' '));
-    return `javascript:${encodedCode}`;
+    return 'javascript:' + encodeURIComponent(code.replace(/\s+/g, ' '));
 }
 
-// Function to update the bookmarklet link in settings
-function updateBookmarkletLink() {
+// Update the bookmarklet URL
+function updateBookmarkletURL() {
+    const userInfo = generateRandomUserInfo();
+    const bookmarkletURL = generateBookmarkletCode(userInfo);
+    
     const bookmarkletLink = document.getElementById('autofill-bookmarklet');
     if (bookmarkletLink) {
-        bookmarkletLink.href = generateAutofillBookmarklet();
+        bookmarkletLink.href = bookmarkletURL;
     }
+    
+    // Also update the display fields if they exist
+    displayUserInfo(userInfo);
+    
+    return userInfo;
 }
 
-// Function to add a random autofill button
-function addRandomAutofillButton() {
-    const form = document.getElementById('autofill-settings-form');
-    if (form) {
-        const actionDiv = form.querySelector('.autofill-actions');
-        if (actionDiv) {
-            // Create random fill button
-            const randomButton = document.createElement('button');
-            randomButton.type = 'button';
-            randomButton.id = 'random-autofill-settings';
-            randomButton.className = 'btn btn-secondary';
-            randomButton.innerHTML = '<i class="fas fa-dice"></i> Generate Random Info';
-            
-            // Add click event
-            randomButton.addEventListener('click', function() {
-                // Generate random info
-                generateRandomUserInfo();
-                
-                // Update form with random data (except email)
-                document.getElementById('autofill-firstname').value = userInfo.firstName;
-                document.getElementById('autofill-lastname').value = userInfo.lastName;
-                document.getElementById('autofill-phone').value = userInfo.phone;
-                document.getElementById('autofill-street').value = userInfo.address.street;
-                document.getElementById('autofill-city').value = userInfo.address.city;
-                document.getElementById('autofill-state').value = userInfo.address.state;
-                document.getElementById('autofill-zip').value = userInfo.address.zip;
-                
-                // Save to localStorage
-                saveUserInfo();
-                
-                // Update bookmarklet
-                updateBookmarkletLink();
-                
-                // Notify user
-                alert('Random information generated! Email field left empty for your own list.');
-            });
-            
-            // Insert before the save button
-            actionDiv.insertBefore(randomButton, actionDiv.firstChild);
+// Display user info in the form
+function displayUserInfo(userInfo) {
+    const fields = {
+        'autofill-firstname': userInfo.firstName,
+        'autofill-lastname': userInfo.lastName,
+        'autofill-email': userInfo.email,
+        'autofill-phone': userInfo.phone,
+        'autofill-street': userInfo.address.street,
+        'autofill-city': userInfo.address.city,
+        'autofill-state': userInfo.address.state,
+        'autofill-zip': userInfo.address.zip
+    };
+    
+    for (const id in fields) {
+        const element = document.getElementById(id);
+        if (element) {
+            element.value = fields[id];
         }
     }
 }
 
-// Initialize the autofill settings in the UI
-function initAutofillSettings() {
-    // Load saved info, if none exists, generate random
-    const hasUserInfo = loadSavedInfo();
-    if (!hasUserInfo) {
-        generateRandomUserInfo();
+// Set up the autofill button
+function setupAutofillButton() {
+    const generateButton = document.getElementById('generate-autofill');
+    if (generateButton) {
+        generateButton.addEventListener('click', function() {
+            const userInfo = updateBookmarkletURL();
+            alert('Random identity generated! Drag the bookmarklet to your bookmarks bar.');
+        });
     }
-    
-    // Populate the form fields with saved values
-    const form = document.getElementById('autofill-settings-form');
-    if (form) {
-        form.querySelector('#autofill-firstname').value = userInfo.firstName || '';
-        form.querySelector('#autofill-lastname').value = userInfo.lastName || '';
-        form.querySelector('#autofill-email').value = userInfo.email || '';
-        form.querySelector('#autofill-phone').value = userInfo.phone || '';
-        form.querySelector('#autofill-street').value = userInfo.address.street || '';
-        form.querySelector('#autofill-city').value = userInfo.address.city || '';
-        form.querySelector('#autofill-state').value = userInfo.address.state || '';
-        form.querySelector('#autofill-zip').value = userInfo.address.zip || '';
-        
-        // Add save button event listener
-        const saveButton = document.getElementById('save-autofill-settings');
-        if (saveButton) {
-            saveButton.addEventListener('click', function() {
-                getUserInfoFromForm();
-                updateBookmarkletLink();
-                alert('Your checkout information has been saved!');
-            });
-        }
-    }
-    
-    // Add random autofill button
-    addRandomAutofillButton();
-    
-    // Set up the bookmarklet link
-    updateBookmarkletLink();
 }
 
-// Wait for the DOM to be ready, then initialize
-document.addEventListener('DOMContentLoaded', function() {
-    // Check if we're on the settings page
-    if (document.getElementById('autofill-settings-form')) {
-        initAutofillSettings();
+// Initialize immediately when the script loads
+function init() {
+    console.log('Autofill script initializing');
+    updateBookmarkletURL();
+    setupAutofillButton();
+}
+
+// Initialize
+document.addEventListener('DOMContentLoaded', init);
+
+// Also initialize if DOM is already loaded
+if (document.readyState === 'complete' || document.readyState === 'interactive') {
+    console.log('DOM already loaded - initializing autofill');
+    setTimeout(init, 100);
+}
+
+// Force initialization when the autofill settings container becomes visible
+const toggleInterval = setInterval(function() {
+    const container = document.getElementById('autofill-settings-container');
+    if (container && container.classList.contains('visible')) {
+        init();
     }
-});
+}, 500);
+
+// Call init right away
+init();
