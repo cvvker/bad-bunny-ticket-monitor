@@ -195,55 +195,101 @@ def generate_event_url(month, day):
         return None
     return url
 
-def send_discord_notification(message, use_mentions=False):
-    """Send a notification to Discord via webhook"""
-    if not DISCORD_WEBHOOK_URL:
-        logger.warning("Discord webhook URL not set, skipping notification")
-        return
+def send_discord_notification(message, use_mentions=False, title=None, color=None, image_url=None, cart_info=None):
+    """
+    Sends a notification to Discord webhook with optional mentions, title, color, and image
     
-    try:
-        # Add appropriate mentions if needed
-        if use_mentions:
-            message = f"@everyone {message}"
-            
-        payload = {
-            "content": message,
-            "username": "Bad Bunny Ticket Monitor",
-            "avatar_url": "https://i.imgur.com/MJd3Vpx.jpg"
+    Args:
+        message: The message to send
+        use_mentions: Whether to include @everyone in the message
+        title: Title for the embed message
+        color: Color for the embed message (hexadecimal integer)
+        image_url: URL for an image to include in the embed
+        cart_info: Dictionary with cart information (optional)
+    """
+    if use_mentions:
+        message = "@everyone " + message
+        
+    payload = {
+        "username": "Bad Bunny Ticket Monitor",
+        "avatar_url": "https://i.imgur.com/MQ3Dvz0.png"
+    }
+    
+    # If we have cart info, create a rich embed
+    if cart_info:
+        date = cart_info.get('date', 'Unknown date')
+        quantity = cart_info.get('quantity', 'Unknown quantity')
+        price = cart_info.get('price', 'Unknown price')
+        section = cart_info.get('section', 'Unknown section')
+        cart_url = cart_info.get('cart_url', '')
+        
+        embed = {
+            "title": "🎫 TICKETS ADDED TO CART! 🎫",
+            "color": 16711680,  # Red color
+            "fields": [
+                {
+                    "name": "Event",
+                    "value": f"Bad Bunny - {date}",
+                    "inline": True
+                },
+                {
+                    "name": "Quantity",
+                    "value": str(quantity),
+                    "inline": True
+                }
+            ],
+            "footer": {
+                "text": "Bad Bunny Ticket Monitor"
+            },
+            "timestamp": datetime.now().isoformat()
         }
         
-        response = requests.post(DISCORD_WEBHOOK_URL, json=payload)
-        response.raise_for_status()
+        # Add price if available
+        if price and price != 'Unknown price':
+            embed["fields"].append({
+                "name": "Price",
+                "value": f"${price}",
+                "inline": True
+            })
+            
+        # Add section if available
+        if section and section != 'Unknown section':
+            embed["fields"].append({
+                "name": "Section",
+                "value": section,
+                "inline": True
+            })
         
-        # For high-priority alerts, send a second notification after a delay
-        if "TICKETS AVAILABLE" in message or "CHECK NOW" in message:
-            time.sleep(1)  # Short delay between notifications
+        # Add cart URL as an action button (Discord uses Markdown for this)
+        if cart_url:
+            embed["description"] = f"**[PROCEED TO CHECKOUT]({cart_url})**\n\nMove quickly! Tickets may sell out."
+        
+        payload["embeds"] = [embed]
+    elif title:
+        embed = {
+            "title": title,
+            "description": message,
+            "color": color if color else 5814783,  # Default to a blue color if none specified
+        }
+        
+        if image_url:
+            embed["image"] = {"url": image_url}
             
-            # Second notification with step-by-step instructions
-            instructions = """
-**URGENT: Tickets may be available!** 🔥
-
-**Follow these steps immediately:**
-1. Click the ticket link above
-2. Select your ticket quantity
-3. Complete checkout as quickly as possible
-4. Tickets sell out fast - don't hesitate!
-
-Good luck! 🍀
-            """
-            
-            follow_up = {
-                "content": instructions,
-                "username": "Bad Bunny Ticket Monitor",
-                "avatar_url": "https://i.imgur.com/MJd3Vpx.jpg"
-            }
-            
-            response = requests.post(DISCORD_WEBHOOK_URL, json=follow_up)
-            response.raise_for_status()
-            
-        logger.info("Discord notification sent successfully")
+        payload["embeds"] = [embed]
+        payload["content"] = "@everyone" if use_mentions else ""
+    else:
+        payload["content"] = message
+    
+    try:
+        response = requests.post(
+            DISCORD_WEBHOOK_URL,
+            json=payload
+        )
+        response.raise_for_status()
+        return True
     except Exception as e:
-        logger.error(f"Error sending Discord notification: {e}")
+        print(f"Error sending Discord notification: {e}")
+        return False
 
 def check_ticketera_availability(event_url):
     """Check if tickets are available on Ticketera."""

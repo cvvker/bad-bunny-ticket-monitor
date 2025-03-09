@@ -13,6 +13,7 @@ from datetime import datetime
 import time
 import random
 import logging
+import re
 
 # Setup logging
 logging.basicConfig(
@@ -59,22 +60,74 @@ def simulate_cart_success(event_id, event_name, checkout_url="https://choli.tick
     """Simulate a successful cart operation"""
     logger.info(f"Simulating successful cart for: {event_name}")
     
-    # Create a notification message
-    message = (
-        f"🎫 **[SIMULATION] TICKETS ADDED TO CART!** 🎫\n"
-        f"Event: {event_name}\n"
-        f"Quantity: 2\n"
-        f"[PROCEED TO CHECKOUT]({checkout_url})\n\n"
-        f"*This is a simulated carting success for testing purposes.*"
-    )
+    # Extract date from event name
+    date_match = re.search(r'(\w+ \d+)', event_name)
+    event_date = date_match.group(1) if date_match else "Unknown date"
     
-    # Send notification
-    send_discord_notification(message, use_mentions=True)
+    # Create simulated cart info
+    cart_info = {
+        'date': event_date,
+        'quantity': 2,
+        'price': random.randint(150, 350),
+        'section': random.choice(["Floor", "Lower Level", "Upper Level", "VIP", "General Admission"]),
+        'cart_url': checkout_url
+    }
+    
+    # Send enhanced notification with cart details
+    try:
+        data = {
+            "username": "Bad Bunny Ticket Monitor",
+            "avatar_url": "https://i.imgur.com/MQ3Dvz0.png",
+            "embeds": [
+                {
+                    "title": "🎫 **[SIMULATION] TICKETS ADDED TO CART!** 🎫",
+                    "color": 16711680,  # Red color
+                    "fields": [
+                        {
+                            "name": "Event",
+                            "value": f"Bad Bunny - {event_date}",
+                            "inline": True
+                        },
+                        {
+                            "name": "Quantity",
+                            "value": str(cart_info['quantity']),
+                            "inline": True
+                        },
+                        {
+                            "name": "Price",
+                            "value": f"${cart_info['price']}",
+                            "inline": True
+                        },
+                        {
+                            "name": "Section",
+                            "value": cart_info['section'],
+                            "inline": True
+                        }
+                    ],
+                    "description": f"**[PROCEED TO CHECKOUT]({checkout_url})**\n\nMove quickly! Tickets may sell out.\n\n*This is a simulated carting success for testing purposes.*",
+                    "footer": {
+                        "text": "Bad Bunny Ticket Monitor - SIMULATION"
+                    },
+                    "timestamp": datetime.now().isoformat()
+                }
+            ],
+            "content": "@everyone"
+        }
+        
+        response = requests.post(
+            DISCORD_WEBHOOK_URL,
+            json=data
+        )
+        response.raise_for_status()
+        logger.info(f"Discord notification sent successfully")
+    except Exception as e:
+        logger.error(f"Error sending Discord notification: {e}")
     
     return {
         'success': True,
         'eventId': event_id,
-        'status': 'success'
+        'status': 'success',
+        'cart_info': cart_info
     }
 
 def simulate_cart_failure(event_id, event_name, reason="Simulation test - tickets sold out too quickly"):
