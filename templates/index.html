@@ -5,8 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Bad Bunny Ticket Monitor - v2.0</title>
     <link rel="icon" href="{{ url_for('static', filename='favicon.ico') }}">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css">
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/checkout.css') }}">
+    <script src="{{ url_for('static', filename='js/checkout.js') }}" defer></script>
     <style>
         :root {
             --dark-bg: #121212;
@@ -219,7 +222,6 @@
             display: block !important;
         }
     </style>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
 </head>
 <body>
     <div class="container mt-5">
@@ -508,6 +510,8 @@
             fetch('/api/tickets')
                 .then(response => response.json())
                 .then(data => {
+                    console.log('Received ticket data:', data);
+                    
                     if (data && Object.keys(data).length > 0) {
                         // Add missing dates if any are missing from the API response
                         for (const month in CONCERT_DATES) {
@@ -534,7 +538,7 @@
                     updateTicketUI(dataToUse);
                 });
         }
-
+        
         function generateFallbackEntryForDate(month, day) {
             const date = `${month} ${day}, 2025`;
             return {
@@ -544,44 +548,6 @@
                 lastChecked: "Checking...",
                 url: getUrlForDate(month, day)
             };
-        }
-
-        function getUrlForDate(month, day) {
-            // Hardcoded URLs for each date
-            const urls = {
-                'July': {
-                    '12': "https://choli.ticketera.com/checkout/67801ac67b15db4542eeed7e?underShop=67801ac67b15db4542eeee56&boxOnly=true",
-                    '18': "https://choli.ticketera.com/checkout/67801c6485e7610f9b45cb54?underShop=67801c6585e7610f9b45cbce&boxOnly=true",
-                    '19': "https://choli.ticketera.com/event/67801ccc52c0091cff4e33a7/67801ccd52c0091cff4e33f7"
-                },
-                'August': {
-                    '1': "https://choli.ticketera.com/checkout/677ff055a1198f5724fc1158?underShop=677ff055a1198f5724fc11a8",
-                    '2': "https://choli.ticketera.com/checkout/678276b19c10a4675dcd677b?underShop=678276b19c10a4675dcd67d4",
-                    '3': "https://choli.ticketera.com/checkout/6782776b39978af92af5d38e?underShop=6782776c39978af92af5d3e7",
-                    '8': "https://choli.ticketera.com/checkout/678278919c8c608b8c0ebdd2?underShop=678278929c8c608b8c0ebe2b",
-                    '9': "https://choli.ticketera.com/checkout/6782790885a03cd75926079c?underShop=6782790885a03cd759260898",
-                    '10': "https://choli.ticketera.com/checkout/67827a23406d3f4b30602cf9?underShop=67827a23406d3f4b30602d52",
-                    '15': "https://choli.ticketera.com/checkout/67827aecbb4a8ef99dab15e8?underShop=67827aecbb4a8ef99dab1641",
-                    '16': "https://choli.ticketera.com/checkout/67827b7b0cc574c721710a65?underShop=67827b7c0cc574c721710abe",
-                    '17': "https://choli.ticketera.com/checkout/67827c0f96690559d725b430?underShop=67827c1096690559d725b489",
-                    '22': "https://choli.ticketera.com/checkout/67827cf5564ad8f63c77f57d?underShop=67827cf5564ad8f63c77f5d8",
-                    '23': "https://choli.ticketera.com/checkout/67827da9651f8bdbe0bd3f0e?underShop=67827daa651f8bdbe0bd3f67",
-                    '24': "https://choli.ticketera.com/checkout/67827f39c3c7b7d600ca906a?underShop=67827f3ac3c7b7d600ca90ce",
-                    '29': "https://choli.ticketera.com/checkout/67827fce1104e5b3ac99c82a?underShop=67827fce1104e5b3ac99c883",
-                    '30': "https://choli.ticketera.com/checkout/678281fdc311c1c0762df8d6?underShop=678281fec311c1c0762df93d",
-                    '31': "https://choli.ticketera.com/checkout/6782827df1edcc48da3866fb?underShop=6782827ef1edcc48da386754"
-                },
-                'September': {
-                    '5': "https://choli.ticketera.com/checkout/678285d0a9936d5291154f60?underShop=678285d1a9936d5291154fb9",
-                    '6': "https://choli.ticketera.com/checkout/67828834bb4a8ef99daf35b9?underShop=67828835bb4a8ef99daf361c",
-                    '7': "https://choli.ticketera.com/checkout/67828abbf9dde02e3c3f059d?underShop=67828abcf9dde02e3c3f062d",
-                    '12': "https://choli.ticketera.com/checkout/67828d8333f81d3543d0a47c?underShop=67828d8333f81d3543d0a575",
-                    '13': "https://choli.ticketera.com/checkout/67828df40952cb5ab00ba5dd?underShop=67828df40952cb5ab00ba636",
-                    '14': "https://choli.ticketera.com/checkout/67828e871104e5b3ac9ed068?underShop=67828e871104e5b3ac9ed0c1"
-                }
-            };
-            
-            return urls[month]?.[day] || "https://choli.ticketera.com/";
         }
 
         // Generates fallback data for all dates
@@ -594,6 +560,51 @@
                 }
             }
             return fallbackData;
+        }
+
+        function enhancedUpdateTicketUI(eventId, event) {
+            const container = document.getElementById('tickets-container');
+            if (!container) return;
+            
+            // Find the existing card or create a new one
+            let card = container.querySelector(`.ticket-card[data-event-id="${eventId}"]`);
+            if (!card) {
+                card = createEventCard(eventId, event);
+                container.appendChild(card);
+            } else {
+                // Update the card's content
+                const statusBadge = card.querySelector('.status-badge');
+                const statusAlert = card.querySelector('.status-alert');
+                const cardText = card.querySelector('.card-text');
+                const cardTitle = card.querySelector('.card-title');
+                
+                // Determine the appropriate status class
+                let statusClass = 'alert-info';
+                let statusText = event.status || "⚡ Not Yet Available";
+                let urgentClass = '';
+                
+                if (statusText.includes('AVAILABLE') || statusText.includes('CHECK NOW')) {
+                    statusClass = 'alert-success';
+                    urgentClass = 'urgent-alert';
+                } else if (statusText.includes('Queue') || statusText.includes('Waitlist')) {
+                    statusClass = 'alert-warning';
+                } else if (statusText.includes('Not Available') || statusText.includes('Sold Out') || statusText.includes('Blocked')) {
+                    statusClass = 'alert-danger';
+                }
+                
+                // Update the card's status
+                statusBadge.className = `badge ${statusClass} status-badge`;
+                statusBadge.textContent = statusText;
+                statusAlert.className = `status-alert ${statusClass}`;
+                cardText.textContent = `Last checked: ${event.lastChecked || "Pending..."}`;
+                cardTitle.textContent = event.name;
+                
+                // Add urgent class if needed
+                if (urgentClass && !card.classList.contains(urgentClass)) {
+                    card.classList.add(urgentClass);
+                    setTimeout(() => card.classList.remove(urgentClass), 3000);
+                }
+            }
         }
 
         function updateTicketUI(data) {
@@ -628,7 +639,7 @@
                 const col = document.createElement('div');
                 col.className = 'col-md-4 mb-4';
                 col.innerHTML = `
-                    <div class="card ticket-card" data-event-id="${eventId}">
+                    <div class="card ticket-card" id="${eventId}" data-event-id="${eventId}">
                         <div class="status-alert alert-info"></div>
                         <div class="card-body">
                             <h5 class="card-title">${event.name}</h5>
@@ -648,7 +659,42 @@
                 const statusAlert = ticketCard.querySelector('.status-alert');
                 
                 let alertClass = 'alert-info';
-                if (event.status.includes('Available')) {
+                
+                // Check for checkout links in the status text (highest priority)
+                if (event.status.includes('CHECKOUT AVAILABLE')) {
+                    alertClass = 'alert-danger';
+                    statusBadge.className = 'badge checkout-status status-badge';
+                    ticketCard.classList.add('checkout-available', 'shake');
+                    
+                    // Add checkout button if there's a link
+                    const linkMatch = event.status.match(/Link: (https?:\/\/[^\s]+)/);
+                    if (linkMatch && linkMatch[1]) {
+                        const checkoutLink = linkMatch[1].replace('...', '');
+                        
+                        // Create checkout button container
+                        const buttonContainer = document.createElement('div');
+                        buttonContainer.className = 'checkout-button-container text-center mt-3';
+                        
+                        // Create checkout button
+                        const checkoutButton = document.createElement('a');
+                        checkoutButton.className = 'btn btn-danger checkout-button';
+                        checkoutButton.innerHTML = '<i class="fas fa-shopping-cart"></i> GO TO CHECKOUT';
+                        checkoutButton.href = checkoutLink;
+                        checkoutButton.target = '_blank';
+                        
+                        buttonContainer.appendChild(checkoutButton);
+                        ticketCard.querySelector('.card-body').appendChild(buttonContainer);
+                        
+                        // Play alert sound with maximum urgency when checkout is available
+                        if (previousStates[eventId] && !previousStates[eventId].includes('CHECKOUT AVAILABLE') && isSoundEnabled()) {
+                            // Play the sound multiple times to indicate urgency
+                            playAlertSound();
+                            setTimeout(playAlertSound, 1000);
+                            setTimeout(playAlertSound, 2000);
+                        }
+                    }
+                }
+                else if (event.status.includes('Available')) {
                     alertClass = 'alert-success';
                     statusBadge.className = 'badge alert-success status-badge';
                     ticketCard.classList.add('shake');

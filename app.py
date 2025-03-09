@@ -228,24 +228,23 @@ Good luck! 🍀
         logger.error(f"Error sending Discord notification: {e}")
 
 def check_ticketera_availability(event_url):
+    """Check if tickets are available on Ticketera."""
     # Create a session with retry capability
     session = requests.Session()
-    retry_strategy = Retry(
-        total=5,  # Maximum number of retries
-        backoff_factor=1,  # Time factor between retries
-        status_forcelist=[429, 500, 502, 503, 504],  # Retry on these status codes
-        allowed_methods=["GET"]
+    retry = Retry(
+        total=5,
+        backoff_factor=0.5,
+        status_forcelist=[500, 502, 503, 504],
     )
-    adapter = HTTPAdapter(max_retries=retry_strategy)
-    session.mount("http://", adapter)
-    session.mount("https://", adapter)
+    adapter = HTTPAdapter(max_retries=retry)
+    session.mount('http://', adapter)
+    session.mount('https://', adapter)
     
-    # Get a random user agent from a large pool of real browser user agents
+    # Rotate user agents to avoid detection
     user_agents = [
         # Chrome Windows
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/119.0.0.0 Safari/537.36",
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/118.0.0.0 Safari/537.36",
         # Firefox Windows
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:120.0) Gecko/20100101 Firefox/120.0",
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:119.0) Gecko/20100101 Firefox/119.0",
@@ -291,6 +290,62 @@ def check_ticketera_availability(event_url):
         
         # Parse the html content
         soup = BeautifulSoup(response.text, 'lxml')
+        
+        # Look for checkout links
+        checkout_links = []
+        # Search for checkout links in href attributes
+        checkout_pattern = "/checkout/"
+        for link in soup.find_all('a', href=True):
+            if checkout_pattern in link['href']:
+                checkout_links.append(link['href'])
+        
+        # Also look for checkout links in the page JavaScript
+        for script in soup.find_all('script'):
+            if script.string and checkout_pattern in script.string:
+                # Extract potential checkout URLs from JavaScript
+                script_text = script.string
+                start_idx = 0
+                while True:
+                    start_idx = script_text.find(checkout_pattern, start_idx)
+                    if start_idx == -1:
+                        break
+                    # Try to extract the full URL
+                    end_idx = script_text.find('"', start_idx)
+                    if end_idx == -1:
+                        end_idx = script_text.find("'", start_idx)
+                    if end_idx == -1:
+                        end_idx = script_text.find('\\', start_idx)
+                    if end_idx == -1:
+                        end_idx = script_text.find(' ', start_idx)
+                    if end_idx == -1:
+                        end_idx = start_idx + 100  # Limit to reasonable length
+                    
+                    potential_link = script_text[start_idx-20:end_idx].strip()
+                    if 'http' in potential_link:
+                        http_start = potential_link.find('http')
+                        potential_link = potential_link[http_start:]
+                        checkout_links.append(potential_link)
+                    else:
+                        checkout_links.append('https://choli.ticketera.com' + potential_link)
+                    
+                    start_idx = end_idx
+        
+        # If we found checkout links, this is highly valuable information
+        if checkout_links:
+            checkout_links = list(set(checkout_links))  # Remove duplicates
+            # Format the first checkout link for display
+            formatted_link = checkout_links[0]
+            if len(formatted_link) > 60:
+                formatted_link = formatted_link[:60] + "..."
+            
+            # Save the checkout links to a file for quick access
+            event_name = event_url.split('/')[-1]
+            with open(f"checkout_links_{event_name}.txt", "w") as f:
+                for link in checkout_links:
+                    f.write(link + "\n")
+            
+            # Return a special message with checkout link information
+            return f"🚨 DIRECT CHECKOUT AVAILABLE! 🚨 Link: {formatted_link}"
         
         # Look for indicators of ticket availability
         if "¡Entradas disponibles!" in response.text or "Comprar ahora" in response.text:
@@ -395,7 +450,7 @@ def check_with_playwright(event_url):
             
             # Set various headers to appear more like a real browser
             page.set_extra_http_headers({
-                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.7",
                 "Accept-Language": "en-US,en;q=0.9,es;q=0.8",
                 "Accept-Encoding": "gzip, deflate, br",
                 "Connection": "keep-alive",
@@ -418,6 +473,66 @@ def check_with_playwright(event_url):
             
             # Check for ticket availability indicators in the content
             if "¡Entradas disponibles!" in content or "Comprar ahora" in content:
+                # Look for checkout links in the page
+                checkout_links = []
+                checkout_pattern = "/checkout/"
+                
+                # Look for links in href attributes
+                links = page.query_selector_all('a[href*="checkout"]')
+                for link in links:
+                    href = link.get_attribute('href')
+                    if href and checkout_pattern in href:
+                        checkout_links.append(href)
+                
+                # Look for checkout links in scripts
+                scripts = page.query_selector_all('script')
+                for script in scripts:
+                    script_text = script.inner_text()
+                    if script_text and checkout_pattern in script_text:
+                        start_idx = 0
+                        while True:
+                            start_idx = script_text.find(checkout_pattern, start_idx)
+                            if start_idx == -1:
+                                break
+                            # Try to extract the full URL
+                            end_idx = script_text.find('"', start_idx)
+                            if end_idx == -1:
+                                end_idx = script_text.find("'", start_idx)
+                            if end_idx == -1:
+                                end_idx = script_text.find('\\', start_idx)
+                            if end_idx == -1:
+                                end_idx = script_text.find(' ', start_idx)
+                            if end_idx == -1:
+                                end_idx = start_idx + 100  # Limit to reasonable length
+                            
+                            potential_link = script_text[start_idx-20:end_idx].strip()
+                            if 'http' in potential_link:
+                                http_start = potential_link.find('http')
+                                potential_link = potential_link[http_start:]
+                                checkout_links.append(potential_link)
+                            else:
+                                checkout_links.append('https://choli.ticketera.com' + potential_link)
+                            
+                            start_idx = end_idx
+                
+                # If we found checkout links, this is highly valuable information
+                if checkout_links:
+                    checkout_links = list(set(checkout_links))  # Remove duplicates
+                    # Format the first checkout link for display
+                    formatted_link = checkout_links[0]
+                    if len(formatted_link) > 60:
+                        formatted_link = formatted_link[:60] + "..."
+                    
+                    # Save the checkout links to a file for quick access
+                    event_name = event_url.split('/')[-1]
+                    with open(f"checkout_links_{event_name}.txt", "w") as f:
+                        for link in checkout_links:
+                            f.write(link + "\n")
+                    
+                    browser.close()
+                    # Return a special message with checkout link information
+                    return f"🚨 DIRECT CHECKOUT AVAILABLE! 🚨 Link: {formatted_link}"
+                
                 # Try to extract actual inventory numbers if available
                 try:
                     # Look for the inventory counter in the JSON data that's often embedded in the page

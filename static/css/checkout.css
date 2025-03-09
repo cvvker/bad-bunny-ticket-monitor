@@ -1,0 +1,37 @@
+/* Checkout specific styling */
+
+.checkout-status {
+    color: white !important;
+    background-color: #dc3545 !important;
+    animation: flash 0.5s linear infinite;
+    font-weight: bold;
+}
+
+.checkout-available {
+    box-shadow: 0 0 15px rgba(220, 53, 69, 0.7);
+}
+
+.checkout-button {
+    animation: pulse 1s infinite;
+    font-weight: bold;
+    font-size: 1.2em;
+    padding: 10px 20px;
+}
+
+.checkout-button-container {
+    margin-top: 15px;
+}
+
+/* Animation for checkout button */
+@keyframes pulse {
+    0% { transform: scale(1); }
+    50% { transform: scale(1.05); }
+    100% { transform: scale(1); }
+}
+
+/* Flash animation for checkout status */
+@keyframes flash {
+    0% { opacity: 1; }
+    50% { opacity: 0.5; }
+    100% { opacity: 1; }
+}
