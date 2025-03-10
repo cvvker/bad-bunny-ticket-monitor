@@ -225,10 +225,100 @@
         #custom-sound-container.visible {
             display: block !important;
         }
+        
+        /* Navbar custom styling */
+        .navbar {
+            background-color: var(--dark-accent) !important;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
+        }
+        
+        .navbar-brand {
+            color: var(--accent-color);
+            font-weight: bold;
+        }
+        
+        .dropdown-menu-dark {
+            background-color: var(--dark-accent);
+            border: 1px solid var(--dark-primary);
+        }
+        
+        .dropdown-item:hover {
+            background-color: var(--dark-primary);
+        }
+        
+        .dropdown-item:active {
+            background-color: var(--dark-primary);
+        }
+        
+        .dropdown-divider {
+            border-top: 1px solid #363636;
+        }
+
+        /* Fix container visibility toggle for cart and autofill */
+        #autofill-settings-container, #cart-settings-container {
+            display: none;
+        }
+        
+        #autofill-settings-container.visible, #cart-settings-container.visible {
+            display: block;
+            animation: fadeIn 0.3s ease-in;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
     </style>
 </head>
 <body>
-    <div class="container mt-5">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
+        <div class="container">
+            <a class="navbar-brand" href="#">
+                <i class="fas fa-ticket-alt me-2"></i>Bad Bunny Ticket Monitor
+            </a>
+            <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <span class="navbar-toggler-icon"></span>
+            </button>
+            <div class="collapse navbar-collapse" id="navbarNav">
+                <ul class="navbar-nav ms-auto">
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="autoCartDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-shopping-cart me-1"></i> Auto Cart
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="autoCartDropdown">
+                            <li><a class="dropdown-item" href="#" onclick="toggleCartSettings()">Cart Settings</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#" onclick="refreshCartSettings()">Refresh Cart Settings</a></li>
+                            <li><a class="dropdown-item" href="#" onclick="refreshCartStatus()">View Active Carts</a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="autofillDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-id-card me-1"></i> Autofill
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="autofillDropdown">
+                            <li><a class="dropdown-item" href="#" onclick="toggleAutofillSettings()">Autofill Settings</a></li>
+                            <li><hr class="dropdown-divider"></li>
+                            <li><a class="dropdown-item" href="#" onclick="document.getElementById('generate-random').click()">Generate Random Info</a></li>
+                            <li><a class="dropdown-item" href="#" onclick="document.getElementById('save-autofill').click()">Save Settings</a></li>
+                        </ul>
+                    </li>
+                    <li class="nav-item dropdown">
+                        <a class="nav-link dropdown-toggle" href="#" id="soundDropdown" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                            <i class="fas fa-volume-up me-1"></i> Sound
+                        </a>
+                        <ul class="dropdown-menu dropdown-menu-dark" aria-labelledby="soundDropdown">
+                            <li><a class="dropdown-item" href="#" onclick="toggleSound()">Toggle Sound</a></li>
+                            <li><a class="dropdown-item" href="#" onclick="toggleCustomSoundOptions()">Custom Sound Options</a></li>
+                            <li><a class="dropdown-item" href="#" onclick="testSound()">Test Sound</a></li>
+                        </ul>
+                    </li>
+                </ul>
+            </div>
+        </div>
+    </nav>
+
+    <div class="container mt-4">
         <h1 class="text-center mb-4">Bad Bunny Ticket Monitor</h1>
         
         <div class="alert alert-info">
@@ -237,8 +327,6 @@
             <hr>
             <div class="sound-controls">
                 <i class="fas fa-volume-up me-2"></i> Sound alerts are <span id="sound-status">ENABLED</span>
-                <button class="btn btn-sm btn-outline-light ms-2" onclick="toggleSound()">Toggle Sound</button>
-                <button class="btn btn-sm btn-outline-light ms-2" onclick="toggleCustomSoundOptions()">Custom Sound</button>
             </div>
             
             <div id="custom-sound-container">
@@ -469,15 +557,6 @@
         </div>
 
         <div id="tickets-container"></div>
-    </div>
-
-    <div class="notification-toggle">
-        <button class="btn btn-success" onclick="toggleSound()" id="soundToggle">
-            🔔 Sound ON
-        </button>
-        <button class="btn btn-info" onclick="testNotification()">
-            🔊 Test Alert
-        </button>
     </div>
 
     <audio id="alertSound" preload="auto" style="display: none;">
@@ -1162,16 +1241,46 @@
         
         function toggleAutofillSettings() {
             const container = document.getElementById('autofill-settings-container');
+            const cartContainer = document.getElementById('cart-settings-container');
+            
+            // Close cart settings if open
+            if (cartContainer.classList.contains('visible')) {
+                cartContainer.classList.remove('visible');
+            }
+            
+            // Toggle autofill settings
             container.classList.toggle('visible');
             
-            // Force initialize autofill settings when opening
+            // Scroll to container if visible
             if (container.classList.contains('visible')) {
+                container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                
+                // Check if autofill is already initialized
                 setTimeout(() => {
-                    // Check if autofill is already initialized
                     if (!document.getElementById('random-autofill-settings')) {
                         initAutofillSettings();
                     }
                 }, 100);
+            }
+        }
+        
+        function toggleCartSettings() {
+            const container = document.getElementById('cart-settings-container');
+            const autofillContainer = document.getElementById('autofill-settings-container');
+            
+            // Close autofill settings if open
+            if (autofillContainer.classList.contains('visible')) {
+                autofillContainer.classList.remove('visible');
+            }
+            
+            // Toggle cart settings
+            container.classList.toggle('visible');
+            
+            // Scroll to container if visible
+            if (container.classList.contains('visible')) {
+                container.scrollIntoView({ behavior: 'smooth', block: 'start' });
+                refreshCartSettings(); // Auto-refresh settings when opened
+                refreshCartStatus(); // Get current cart status
             }
         }
     </script>
@@ -1276,18 +1385,6 @@
     </script>
     <script>
         // Initialize the cart settings UI
-        function toggleCartSettings() {
-            const container = document.getElementById('cart-settings-container');
-            container.classList.toggle('visible');
-            
-            // Update cart settings UI when opened
-            if (container.classList.contains('visible')) {
-                refreshCartSettings();
-                refreshCartStatus();
-            }
-        }
-        
-        // Refresh cart settings from server
         function refreshCartSettings() {
             fetch('/api/cart-config')
                 .then(response => response.json())
@@ -1403,10 +1500,7 @@
                     window.cartSystem.updateConfig(config);
                 }
             })
-            .catch(error => {
-                console.error('Error saving cart settings:', error);
-                showNotification('Error saving cart settings', 'error');
-            });
+            .catch(error => console.error('Error saving cart settings:', error));
         }
         
         // Start auto-carting for a specific event
