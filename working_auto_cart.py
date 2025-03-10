@@ -223,78 +223,122 @@ async def send_discord_notification(cart_info):
         return False
 
 async def verify_cart_page(page):
-    """Verify if the current page is actually a cart page with tickets in it"""
+    """Verify that we're on a cart page"""
+    logger.info("Verifying if we're on a cart page")
+    await take_screenshot(page, "cart_verification.png")
     
-    # Try multiple methods to verify we're on a cart page
-    
-    # Method 1: Check URL for cart-related keywords
-    current_url = page.url
-    url_is_cart = any(keyword in current_url.lower() for keyword in [
-        "cart", "checkout", "basket", "bag", "purchase", "boletos", "tickets"
-    ])
-    
-    # Method 2: Check page title for cart-related keywords
-    title = await page.title()
-    title_is_cart = title and any(keyword in title.lower() for keyword in [
-        "cart", "checkout", "basket", "bag", "purchase", "boletos", "carrito", "tickets"
-    ])
-    
-    # Method 3: Check for cart page elements
-    cart_page_selectors = [
-        'h1:has-text("Shopping Cart")', 'h1:has-text("Cart")',
-        'h1:has-text("Checkout")', 'h1:has-text("Carrito")',
-        'div[class*="cart"]', 'div[id*="cart"]',
-        'div[class*="checkout"]', 'div[id*="checkout"]',
-        'table[class*="cart"]', 'tr[class*="cart-item"]',
-        'div[class*="ticket"]', 'div[class*="boleto"]',
-        'button:has-text("Checkout")', 'button:has-text("Proceed to Checkout")',
-        'span:has-text("subtotal")', 'span:has-text("total")'
+    cart_indicators = [
+        "div.cart",
+        "div.shopping-cart",
+        "div[class*='cart']",
+        "div#cart",
+        "div#shopping-cart",
+        "h1:has-text('Cart')",
+        "h1:has-text('Carrito')",
+        "h2:has-text('Cart')",
+        "h2:has-text('Carrito')",
+        "div:has-text('Shopping Cart')",
+        "div:has-text('Carrito de Compras')",
+        "table.cart-items",
+        "div.checkout-section",
+        "div.ticket-summary",
+        "div.order-summary",
+        "button:has-text('Checkout')",
+        "button:has-text('Finalizar Compra')",
+        "button:has-text('Proceed to Checkout')",
+        "button:has-text('Proceder al Pago')",
+        "[class*='checkout']",
+        "form[action*='checkout']",
+        "div.cart-header",
+        "div.cart-footer"
     ]
     
-    content_is_cart = False
-    for selector in cart_page_selectors:
+    found_cart = False
+    for selector in cart_indicators:
         try:
             element = await page.query_selector(selector)
-            if element:
-                content_is_cart = True
-                logger.info(f"Detected cart page element with selector: {selector}")
+            if element and await element.is_visible():
+                logger.info(f"Found cart indicator: {selector}")
+                found_cart = True
                 break
         except Exception as e:
-            pass
+            logger.debug(f"Error checking cart indicator {selector}: {str(e)}")
+            
+    # Also check URL for cart indicators
+    url = page.url.lower()
+    cart_url_indicators = ['cart', 'basket', 'carrito', 'checkout', 'pagar', 'payment', 'order', 'compra']
+    for indicator in cart_url_indicators:
+        if indicator in url:
+            logger.info(f"URL contains cart indicator: {indicator}")
+            found_cart = True
+            break
+            
+    if found_cart:
+        logger.info("CART PAGE VERIFIED!")
+    else:
+        logger.warning("Could not verify cart page")
+        
+    return found_cart
+
+async def verify_tickets_in_cart(page):
+    """Verify that tickets are actually in the cart"""
+    logger.info("Verifying if tickets are in the cart")
     
-    # Method 4: Check if there are any indicators that tickets are in the cart
     ticket_indicators = [
-        'div:has-text("General Admission")', 'div:has-text("Ticket")',
-        'div:has-text("Section")', 'div:has-text("Quantity")',
-        'span:has-text("Price")', 'span:has-text("Fee")',
-        'tr[class*="item"]', 'div[class*="item"]',
-        'div:has-text("TOVK")'
+        "div.cart-item", 
+        "div.line-item", 
+        "[class*='cart-item']", 
+        "[class*='ticket']", 
+        "div:has-text('Ticket')", 
+        "div:has-text('Boleto')",
+        "div.ticket-row",
+        "tr.cart-item",
+        "div.ticket-details",
+        "div.order-line",
+        "div.product-item:has-text('Ticket')",
+        "div.product-item:has-text('Boleto')",
+        "div.purchase-item",
+        "div.ticket-purchase",
+        "div[class*='ticket']"
     ]
     
-    has_tickets = False
+    total_tickets = 0
+    
     for selector in ticket_indicators:
         try:
-            element = await page.query_selector(selector)
-            if element:
-                has_tickets = True
-                logger.info(f"Detected tickets in cart with selector: {selector}")
-                break
+            ticket_elements = await page.query_selector_all(selector)
+            if len(ticket_elements) > 0:
+                logger.info(f"Found {len(ticket_elements)} ticket elements with selector: {selector}")
+                total_tickets = max(total_tickets, len(ticket_elements))
         except Exception as e:
-            logger.debug(f"Error checking selector {selector}: {str(e)}")
+            logger.debug(f"Error checking ticket indicator {selector}: {str(e)}")
     
-    # Return true only if at least two methods confirm we're on a cart page
-    confirmation_count = sum([url_is_cart, title_is_cart, content_is_cart, has_tickets])
-    is_cart = confirmation_count >= 2
-    
-    if is_cart:
-        logger.info("VERIFICATION SUCCESSFUL: Current page is confirmed to be a cart page")
-        # Take an extra screenshot of the verified cart page
-        await page.screenshot(path=os.path.join(os.path.dirname(__file__), "screenshots", "verified_cart.png"))
-        return True
+    if total_tickets > 0:
+        logger.info(f"VERIFIED {total_tickets} TICKETS IN CART!")
+        return total_tickets
     else:
-        logger.warning("VERIFICATION FAILED: Current page does not appear to be a valid cart page")
-        logger.warning(f"URL check: {url_is_cart}, Title check: {title_is_cart}, Content check: {content_is_cart}, Ticket check: {has_tickets}")
-        return False
+        logger.warning("No tickets found in cart")
+        return 0
+
+async def send_success_notification(cart_url, tickets_count):
+    """Send a success notification to Discord with detailed information"""
+    try:
+        concert_details = "Bad Bunny Concert"
+        current_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        message = {
+            'success': True,
+            'message': f"Successfully added {tickets_count} tickets to cart!",
+            'url': cart_url,
+            'timestamp': current_time,
+            'concert': concert_details,
+            'checkout_time': current_time
+        }
+        
+        await send_discord_notification(message)
+        logger.info(f"Success notification sent for {tickets_count} tickets")
+    except Exception as e:
+        logger.error(f"Error sending success notification: {str(e)}")
 
 async def navigate_to_cart(page, event_url):
     """Aggressively tries to navigate to the cart page using multiple methods"""
@@ -389,27 +433,56 @@ async def navigate_to_checkout(page):
     except Exception:
         logger.info("Waiting for networkidle timed out, continuing...")
     
-    # Step 1: Look for ticket type/section options that might appear after clicking BOLETOS
-    ticket_type_selectors = [
-        "div.ticket-type button",
-        "div.ticket-option",
-        "div.ticket-card",
-        "button.btn-primary",
-        "a.btn-primary",
-        "div[class*='ticket']",
-        "div[class*='section']",
-        "[class*='ticket-type']",
-        "[class*='section']",
-        "[data-testid*='ticket']",
-        "[data-testid*='section']"
+    ticket_selected = False
+    
+    # First try to handle seat map selection if present
+    try:
+        # First check if there's a seat map on the page
+        seat_map_result = await select_seat_from_map(page)
+        if seat_map_result:
+            logger.info("Successfully selected seats from seat map")
+            ticket_selected = True
+            await take_screenshot(page, "seats_selected.png")
+            await asyncio.sleep(3)  # Wait for any animations or changes after seat selection
+    except Exception as e:
+        logger.warning(f"Error when trying to select from seat map: {str(e)}")
+    
+    # More specific selectors for the Ticketera (Como Coco) site
+    specific_ticket_selectors = [
+        "button.seats-button",                # Try direct seat selection button
+        "div.seat-map-container .seat:not(.unavailable)",  # Direct seat click on map
+        "select.ticket-quantity-select",       # Quantity selection dropdown
+        "div.ticket-type-selector",            # Ticket type selector
+        "button.select-ticket-button",         # Select ticket button
+        "div.ticket-card",                     # Ticket card selector
+        "div[class*='ticket-container']",      # Any ticket container
+        "div.event-ticket-option",             # Event ticket option
+        "[data-testid='seat-map-seat']:not([data-testid*='unavailable'])",  # Available seat
+        "[data-type='ticket']",                # Generic ticket element
+        "svg circle:not(.unavailable-seat)",   # SVG seat map circles that aren't unavailable
+        "svg circle.available-seat",           # SVG seat map circles marked as available
+        "svg circle.available",                # SVG circles with available class
+        "svg .seat:not(.unavailable)",         # SVG seats that aren't unavailable
+        "svg .seat.available-seat",            # SVG seats marked as available
+        "svg .seat[fill='green']",             # SVG seats filled with green color
+        "svg .seat[fill='#00FF00']",           # SVG seats filled with bright green
+        "svg .seat[fill='#008000']",           # SVG seats filled with dark green 
+        "path.available-seat",                 # Path elements that are available seats
+        ".row-seat:not(.unavailable)",         # Row seats that aren't unavailable
+        ".seat-map rect:not(.unavailable)",    # Rectangle seat elements in a seat map
+        ".seat-map circle:not(.unavailable)"   # Circle seat elements in a seat map
     ]
     
-    ticket_selected = False
-    for selector in ticket_type_selectors:
+    seats_selected = False
+    for selector in specific_ticket_selectors:
         try:
+            logger.info(f"Looking for ticket elements with selector: {selector}")
             elements = await page.query_selector_all(selector)
+            
             if len(elements) > 0:
-                # Click the first ticket option
+                logger.info(f"Found {len(elements)} ticket elements with selector: {selector}")
+                # Click the first available element
+                await elements[0].scroll_into_view_if_needed()
                 await elements[0].click()
                 logger.info(f"Selected ticket option with selector: {selector}")
                 await take_screenshot(page, "ticket_option_selected.png")
@@ -419,69 +492,110 @@ async def navigate_to_checkout(page):
         except Exception as e:
             logger.debug(f"Failed to select ticket option with selector {selector}: {str(e)}")
     
-    # If couldn't find specific elements, try clicking in strategic areas
+    # Fall back to more generic selectors if specific ones don't work
+    if not ticket_selected:
+        ticket_type_selectors = [
+            "div.ticket-type button",
+            "div.ticket-option",
+            "div.ticket-card",
+            "button.btn-primary",
+            "a.btn-primary",
+            "div[class*='ticket']",
+            "div[class*='section']",
+            "[class*='ticket-type']",
+            "[class*='section']",
+            "[data-testid*='ticket']",
+            "[data-testid*='section']"
+        ]
+        
+        for selector in ticket_type_selectors:
+            try:
+                elements = await page.query_selector_all(selector)
+                if len(elements) > 0:
+                    await elements[0].scroll_into_view_if_needed()
+                    await elements[0].click()
+                    logger.info(f"Selected ticket option with selector: {selector}")
+                    await take_screenshot(page, "ticket_option_selected.png")
+                    ticket_selected = True
+                    await asyncio.sleep(2)
+                    break
+            except Exception as e:
+                logger.debug(f"Failed to select ticket option with selector {selector}: {str(e)}")
+    
+    # If still no success, try clicking in likely areas of the page
     if not ticket_selected:
         logger.info("No specific ticket options found, trying to click in likely areas...")
-        # Define a grid of positions to try clicking
-        positions = [
-            (400, 300),  # Center-left
-            (400, 400),  # Middle-left
-            (600, 300),  # Center
-            (600, 400),  # Middle
-            (800, 300),  # Center-right
-            (800, 400)   # Middle-right
-        ]
+        positions = [(400, 300), (400, 400), (600, 300), (600, 400), (800, 300), (800, 400)]
         
         for i, (x, y) in enumerate(positions):
             try:
                 await page.mouse.click(x, y)
                 logger.info(f"Clicked at position ({x}, {y})")
                 await take_screenshot(page, f"ticket_area_click_{i}.png")
-                await asyncio.sleep(1.5)
+                await asyncio.sleep(2.5)  # Longer delay to wait for potential elements to appear
+                
+                # Check if the click revealed any buttons
+                for selector in specific_ticket_selectors + ticket_type_selectors:
+                    elements = await page.query_selector_all(selector)
+                    if len(elements) > 0:
+                        # If clicking revealed buttons, click the first one
+                        await elements[0].scroll_into_view_if_needed()
+                        await elements[0].click()
+                        logger.info(f"Found and clicked ticket option after position click: {selector}")
+                        ticket_selected = True
+                        await asyncio.sleep(1.5)
+                        break
+                
+                if ticket_selected:
+                    break
             except Exception as e:
                 logger.debug(f"Failed to click at position ({x}, {y}): {str(e)}")
     
-    # Step 2: Look for quantity selectors and select quantity
+    # Wait for any actions to complete
+    await asyncio.sleep(3)
+    
+    # Check for quantity selectors and set quantity
     quantity_selectors = [
         "select[name*='quantity']",
         "select[id*='quantity']",
-        "div[class*='quantity'] select",
-        "[aria-label*='quantity']",
-        "input[type='number']"
+        "select.quantity-selector",
+        "input[type='number'][name*='quantity']",
+        "div.quantity-control input",
+        "[data-testid='quantity-selector']"
     ]
     
     for selector in quantity_selectors:
         try:
             quantity_element = await page.query_selector(selector)
             if quantity_element:
+                logger.info(f"Found quantity selector with selector: {selector}")
+                
+                # Check if it's a select dropdown or input field
                 tag_name = await quantity_element.evaluate("el => el.tagName.toLowerCase()")
                 
                 if tag_name == "select":
-                    # If it's a dropdown, select value "2"
                     await quantity_element.select_option("2")
+                    logger.info("Set quantity to 2 via dropdown")
                 elif tag_name == "input":
-                    # If it's an input, type "2"
                     await quantity_element.fill("2")
+                    logger.info("Set quantity to 2 via input field")
                 
-                logger.info(f"Set quantity to 2 using selector: {selector}")
                 await take_screenshot(page, "quantity_set.png")
-                await asyncio.sleep(1)
+                await asyncio.sleep(2)
                 break
         except Exception as e:
             logger.debug(f"Failed to set quantity with selector {selector}: {str(e)}")
     
-    # Step 3: Look for continue/next buttons to move through the process
+    # Look for "Continue" or "Next" buttons
     continue_selectors = [
         "button:has-text('Continue')",
         "button:has-text('Continuar')",
         "button:has-text('Next')",
         "button:has-text('Siguiente')",
         "button.continue-button",
+        "button.next-button",
         "button.btn-primary",
         "a.btn-primary",
-        "[class*='continue']",
-        "[class*='next']",
-        "footer button",
         "button[type='submit']"
     ]
     
@@ -489,9 +603,7 @@ async def navigate_to_checkout(page):
         try:
             continue_button = await page.query_selector(selector)
             if continue_button:
-                # First screenshot before clicking
-                await take_screenshot(page, "before_continue_button.png")
-                
+                await continue_button.scroll_into_view_if_needed()
                 await continue_button.click()
                 logger.info(f"Clicked continue button with selector: {selector}")
                 await take_screenshot(page, "continue_clicked.png")
@@ -500,44 +612,278 @@ async def navigate_to_checkout(page):
         except Exception as e:
             logger.debug(f"Failed to click continue with selector {selector}: {str(e)}")
     
-    # Step 4: Look for "Add to Cart" or similar buttons
+    # Look for "Add to Cart" or similar buttons with more specific selectors for Ticketera
     cart_selectors = [
+        "button#add-to-cart-button",            # Common ID for add to cart
+        "button.add-to-cart-button",            # Common class for add to cart 
         "button:has-text('Add to Cart')",
         "button:has-text('Añadir al Carrito')",
-        "button:has-text('Checkout')",
-        "button:has-text('Pagar')",
-        "button.checkout-button",
+        "button:has-text('Add to cart')",
+        "button:has-text('Añadir')",
         "button.add-to-cart",
-        "button.btn-primary",
-        "a.btn-primary",
-        "[class*='cart']",
-        "[class*='checkout']",
-        "footer button",
-        "button[type='submit']"
+        "[data-testid='add-to-cart']",
+        "button.addtocart",
+        "button:has-text('BOLETOS')",
+        "button:has-text('Tickets')",
+        "button:has-text('Continue')",
+        "button:has-text('Continuar')",
+        "a:has-text('Add to Cart')",
+        "a:has-text('Añadir al Carrito')"
     ]
     
+    cart_url = ""
+    checkout_url = ""
+    
+    # Attempt each cart selector with more careful error handling
     for selector in cart_selectors:
         try:
+            logger.info(f"Looking for add to cart button with selector: {selector}")
             cart_button = await page.query_selector(selector)
             if cart_button:
-                await cart_button.click()
-                logger.info(f"Clicked add to cart button with selector: {selector}")
-                await take_screenshot(page, "add_cart_clicked.png")
-                await asyncio.sleep(3)
+                # Check if the button is visible and enabled
+                is_visible = await cart_button.is_visible()
+                is_enabled = await cart_button.evaluate("el => !el.disabled")
                 
-                # After clicking add to cart, check if we're on the cart page
-                if await verify_cart_page(page):
-                    logger.info("Successfully navigated to cart page!")
-                    return True
+                if is_visible and is_enabled:
+                    await cart_button.scroll_into_view_if_needed()
+                    logger.info(f"Found enabled add to cart button with selector: {selector}")
+                    
+                    # Take screenshot before clicking
+                    await take_screenshot(page, "before_add_to_cart.png")
+                    
+                    # Click the button
+                    await cart_button.click(force=True)  # Use force=True to ensure click happens
+                    logger.info(f"Clicked add to cart button with selector: {selector}")
+                    await take_screenshot(page, "add_cart_clicked.png")
+                    
+                    # Wait longer for potential navigation or cart update
+                    await asyncio.sleep(5)
+                    
+                    # After clicking add to cart, check if we're on a cart page
+                    cart_verification = await verify_cart_page(page)
+                    if cart_verification:
+                        cart_url = page.url
+                        logger.info(f"Successfully navigated to cart page at: {cart_url}")
+                        
+                        # Check for ticket count in cart
+                        try:
+                            cart_items = await page.query_selector_all("div.cart-item, div.line-item, [class*='cart-item'], [class*='ticket'], div:has-text('Ticket'), div:has-text('Boleto')")
+                            logger.info(f"Found {len(cart_items)} items in cart")
+                            
+                            if len(cart_items) > 0:
+                                logger.info("TICKETS SUCCESSFULLY ADDED TO CART!")
+                                await send_discord_notification({
+                                    'success': True,
+                                    'message': f"Successfully added {len(cart_items)} tickets to cart!",
+                                    'url': cart_url,
+                                    'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                                })
+                            else:
+                                logger.warning("Cart page found but no items detected in cart")
+                        except Exception as e:
+                            logger.warning(f"Error counting cart items: {str(e)}")
+                        
+                        # Now look for checkout button
+                        checkout_selectors = [
+                            "button:has-text('Checkout')",
+                            "button:has-text('Pagar')",
+                            "button:has-text('Proceed to Checkout')",
+                            "button:has-text('Proceder al Pago')",
+                            "button.checkout-button",
+                            "a.checkout-button",
+                            "button[class*='checkout']",
+                            "a[class*='checkout']",
+                            "button.btn-primary",
+                            "a.btn-primary"
+                        ]
+                        
+                        for checkout_selector in checkout_selectors:
+                            try:
+                                checkout_button = await page.query_selector(checkout_selector)
+                                if checkout_button:
+                                    await checkout_button.scroll_into_view_if_needed()
+                                    await checkout_button.click()
+                                    logger.info(f"Clicked checkout button with selector: {checkout_selector}")
+                                    await asyncio.sleep(5)
+                                    checkout_url = page.url
+                                    logger.info(f"Successfully navigated to checkout page at: {checkout_url}")
+                                    await take_screenshot(page, "checkout_page.png")
+                                    return {
+                                        'success': True,
+                                        'cart_url': cart_url,
+                                        'checkout_url': checkout_url
+                                    }
+                            except Exception as e:
+                                logger.debug(f"Failed to click checkout button with selector {checkout_selector}: {str(e)}")
+                        
+                        # If we couldn't click a checkout button but are on cart page, still consider success
+                        return {
+                            'success': True,
+                            'cart_url': cart_url,
+                            'checkout_url': ''
+                        }
+                else:
+                    logger.debug(f"Found add to cart button with selector {selector} but it's not visible or enabled")
+            else:
+                logger.debug(f"No add to cart button found with selector: {selector}")
         except Exception as e:
             logger.debug(f"Failed to click add to cart with selector {selector}: {str(e)}")
     
     # If we haven't successfully found the cart page yet, check again
-    if await verify_cart_page(page):
-        logger.info("Successfully navigated to cart page!")
-        return True
+    cart_verification = await verify_cart_page(page)
+    if cart_verification:
+        cart_url = page.url
+        logger.info(f"Successfully navigated to cart page at: {cart_url}")
+        return {
+            'success': True,
+            'cart_url': cart_url,
+            'checkout_url': ''
+        }
+    
+    # Last resort: Try to look for text indicating we're on a relevant page
+    try:
+        page_text = await page.evaluate("() => document.body.innerText")
+        if "cart" in page_text.lower() or "carrito" in page_text.lower():
+            logger.info("Page text contains 'cart' or 'carrito', might be on cart page")
+            current_url = page.url
+            return {
+                'success': True,
+                'cart_url': current_url,
+                'checkout_url': '',
+                'warning': 'Cart page detected by text, but not visually confirmed'
+            }
+    except Exception as e:
+        logger.debug(f"Error checking page text: {str(e)}")
         
-    return False
+    return {
+        'success': False,
+        'error': 'Could not navigate to cart or checkout page',
+        'cart_url': '',
+        'checkout_url': ''
+    }
+
+async def select_seat_from_map(page):
+    """
+    Function to specifically handle seat selection from a seat map interface
+    """
+    logger.info("Attempting to select seats from seat map...")
+    await take_screenshot(page, "seat_map_initial.png")
+    
+    # Try to identify if we're on a seat map page
+    seat_map_indicators = [
+        "div.seat-map",
+        "div[class*='seat-map']", 
+        "div.venue-map",
+        "div[class*='venue-map']", 
+        "svg[class*='seat']", 
+        "svg[class*='map']", 
+        ".seat-selection", 
+        ".map-container"
+    ]
+    
+    seat_map_found = False
+    for selector in seat_map_indicators:
+        try:
+            map_element = await page.query_selector(selector)
+            if map_element:
+                logger.info(f"Seat map found with selector: {selector}")
+                seat_map_found = True
+                break
+        except Exception as e:
+            logger.debug(f"Error checking for seat map with selector {selector}: {str(e)}")
+    
+    if not seat_map_found:
+        logger.info("No seat map detected on page")
+        return False
+        
+    # First try to find and click on seats that appear to be available (typically green)
+    available_seat_selectors = [
+        "svg circle[fill='green'], svg circle[fill='#00FF00'], svg circle[fill='#008000']",
+        "svg .seat[fill='green'], svg .seat[fill='#00FF00'], svg .seat[fill='#008000']",
+        "svg circle.available-seat, svg circle.available, svg circle:not(.unavailable-seat)",
+        "svg .seat.available-seat, svg .seat.available, svg .seat:not(.unavailable)",
+        "svg rect[fill='green'], svg rect[fill='#00FF00'], svg rect[fill='#008000']",
+        "svg path[fill='green'], svg path[fill='#00FF00'], svg path[fill='#008000']",
+        ".row-seat:not(.unavailable), .row-seat.available",
+        ".seat-map rect:not(.unavailable), .seat-map rect.available",
+        ".seat-map circle:not(.unavailable), .seat-map circle.available"
+    ]
+    
+    seats_selected = False
+    for selector in available_seat_selectors:
+        try:
+            available_seats = await page.query_selector_all(selector)
+            if len(available_seats) > 0:
+                logger.info(f"Found {len(available_seats)} available seats with selector: {selector}")
+                
+                # Get the first 1-2 available seats (based on quantity)
+                max_seats = min(2, len(available_seats))
+                for i in range(max_seats):
+                    await available_seats[i].scroll_into_view_if_needed()
+                    await available_seats[i].click()
+                    logger.info(f"Clicked on seat {i+1} with selector: {selector}")
+                    await take_screenshot(page, f"seat_selected_{i+1}.png")
+                    await asyncio.sleep(1)
+                
+                seats_selected = True
+                break
+        except Exception as e:
+            logger.debug(f"Failed to select seats with selector {selector}: {str(e)}")
+    
+    # If no specific seat elements found, try clicking on positions in the seat map
+    if not seats_selected:
+        try:
+            # Try to find the seat map container first
+            seat_map_container = None
+            for selector in seat_map_indicators:
+                try:
+                    container = await page.query_selector(selector)
+                    if container:
+                        seat_map_container = container
+                        break
+                except Exception:
+                    pass
+            
+            if seat_map_container:
+                # Get the bounding box of the seat map
+                bbox = await seat_map_container.bounding_box()
+                if bbox:
+                    logger.info(f"Found seat map container with dimensions: {bbox}")
+                    
+                    # Click in different areas of the seat map where seats might be
+                    click_positions = [
+                        (bbox['x'] + bbox['width'] * 0.3, bbox['y'] + bbox['height'] * 0.3),  # Upper left quadrant
+                        (bbox['x'] + bbox['width'] * 0.7, bbox['y'] + bbox['height'] * 0.3),  # Upper right quadrant
+                        (bbox['x'] + bbox['width'] * 0.3, bbox['y'] + bbox['height'] * 0.7),  # Lower left quadrant
+                        (bbox['x'] + bbox['width'] * 0.7, bbox['y'] + bbox['height'] * 0.7)   # Lower right quadrant
+                    ]
+                    
+                    for i, (x, y) in enumerate(click_positions):
+                        await page.mouse.click(x, y)
+                        logger.info(f"Clicked at position ({x:.1f}, {y:.1f}) in seat map")
+                        await take_screenshot(page, f"seat_map_click_{i+1}.png")
+                        await asyncio.sleep(2)
+                        
+                        # Check if a seat selection confirmation dialog appeared
+                        for confirm_selector in ["button:has-text('Confirm')", "button:has-text('Confirmar')", "button.confirm", ".confirm-button", "button.btn-primary"]:
+                            try:
+                                confirm_button = await page.query_selector(confirm_selector)
+                                if confirm_button:
+                                    await confirm_button.click()
+                                    logger.info(f"Clicked confirm button with selector: {confirm_selector}")
+                                    await take_screenshot(page, "seat_confirmation.png")
+                                    await asyncio.sleep(2)
+                                    seats_selected = True
+                                    break
+                            except Exception:
+                                pass
+                        
+                        if seats_selected:
+                            break
+        except Exception as e:
+            logger.debug(f"Error when trying to click on seat map areas: {str(e)}")
+    
+    return seats_selected
 
 async def automatic_cart_process(page, event_url, options=None):
     """
@@ -554,280 +900,143 @@ async def automatic_cart_process(page, event_url, options=None):
     Returns:
         Dictionary with cart results
     """
+    # Set default options if none provided
+    if options is None:
+        options = {}
+    
+    quantity = options.get('quantity', 2)
+    auto_checkout = options.get('auto_checkout', False)
+    best_available = options.get('best_available', True)
+    
+    logger.info(f"Starting automatic cart process for URL: {event_url}")
+    logger.info(f"Options: quantity={quantity}, auto_checkout={auto_checkout}, best_available={best_available}")
+    
+    # Initialize the result dictionary
+    result = {
+        'success': False,
+        'quantity': quantity,
+        'event_url': event_url,
+        'cart_url': '',
+        'checkout_url': ''
+    }
+    
     try:
-        # Use default options if none provided
-        if options is None:
-            options = {
-                'quantity': 2,
-                'auto_checkout': True,
-                'best_available': True
-            }
-        
-        # Ensure quantity is an integer
-        quantity = int(options.get('quantity', 2))
-        auto_checkout = options.get('auto_checkout', True)
-        best_available = options.get('best_available', True)
-        
-        logger.info(f"Starting auto-cart with options: quantity={quantity}, auto_checkout={auto_checkout}, best_available={best_available}")
-
-        # Navigate to the event page
-        await page.goto(event_url, wait_until="domcontentloaded")
-        logger.info(f"Navigated to event page: {event_url}")
-        
-        # Take initial screenshot
-        await take_screenshot(page, "event_page_initial.png")
-        
-        # Wait for page to fully load with additional timeout
-        try:
-            await page.wait_for_load_state("networkidle", timeout=30000)
-        except Exception as e:
-            logger.warning(f"Network idle wait timed out: {str(e)}")
-        
-        # Add random delay and mouse movements for human-like behavior
-        await human_delay()
-        await random_mouse_movement(page)
-        
-        # If best available is enabled, look for a best available option
-        if best_available:
+        # Step 1: Navigate to the event URL if not already there
+        if page.url != event_url:
+            logger.info(f"Navigating to event URL: {event_url}")
             try:
-                logger.info("Looking for best available option")
-                
-                # Look for "Best Available" button with various selectors
-                best_available_selectors = [
-                    "button:has-text('Best Available')",
-                    "button:has-text('Mejor Disponible')",
-                    ".best-available-button",
-                    "[data-testid='best-available']"
-                ]
-                
-                for selector in best_available_selectors:
-                    best_available_button = await page.query_selector(selector)
-                    if best_available_button:
-                        logger.info(f"Found best available button with selector: {selector}")
-                        await best_available_button.click()
-                        logger.info("Clicked Best Available button")
-                        await human_delay()
-                        await take_screenshot(page, "after_best_available.png")
-                        break
+                await page.goto(event_url, timeout=30000)
+                await take_screenshot(page, "event_page_initial.png")
+                await page.wait_for_load_state("networkidle", timeout=10000)
             except Exception as e:
-                logger.warning(f"Error selecting best available: {str(e)}")
+                logger.error(f"Error navigating to event URL: {str(e)}")
+                return result
         
-        # Look for a quantity selector and set the desired quantity
+        # Step 2: Look for and click BOLETOS/Tickets button
+        # Give extra time for the page to fully load and stabilize
+        await asyncio.sleep(3)
+        boletos_clicked = await click_boletos_button(page)
+        
+        if not boletos_clicked:
+            logger.warning("Could not find or click BOLETOS button")
+            # We might already be on a tickets page, so continue...
+            await take_screenshot(page, "current_page_no_boletos.png")
+        else:
+            logger.info("Successfully clicked BOLETOS button")
+            await take_screenshot(page, "after_boletos_click.png")
+            # Wait for page to stabilize after BOLETOS click
+            await asyncio.sleep(3)
+        
+        # Step 3: Navigate to checkout page with quantity selection
+        # First check if we're on a seat map page and need to select seats
+        seat_map_detected = False
         try:
-            logger.info(f"Setting quantity to {quantity}")
-            
-            # Try different quantity selector patterns
-            quantity_selectors = [
-                "select#quantity",
-                "select.quantity-select",
-                "select[name='quantity']",
-                "select",
-                "input[type='number'][name='quantity']"
+            # Check for seat map indicators
+            seat_map_indicators = [
+                "div.seat-map", "div[class*='seat-map']", 
+                "svg[class*='seat']", "svg[class*='map']",
+                ".seat-selection", ".map-container"
             ]
             
-            quantity_set = False
-            for selector in quantity_selectors:
-                quantity_element = await page.query_selector(selector)
-                if quantity_element:
-                    logger.info(f"Found quantity selector with selector: {selector}")
-                    
-                    # Check if it's a select dropdown or input field
-                    tag_name = await quantity_element.evaluate("el => el.tagName.toLowerCase()")
-                    
-                    if tag_name == "select":
-                        await quantity_element.select_option(str(quantity))
-                        quantity_set = True
-                        logger.info(f"Set quantity to {quantity} via dropdown")
-                    elif tag_name == "input":
-                        await quantity_element.fill(str(quantity))
-                        quantity_set = True
-                        logger.info(f"Set quantity to {quantity} via input field")
-                    
-                    await human_delay()
-                    await take_screenshot(page, "after_quantity_selection.png")
-                    break
-            
-            # If no quantity selector found, try to use +/- buttons
-            if not quantity_set:
-                logger.info("Trying to set quantity using +/- buttons")
-                
-                # Try to find + button and click it repeatedly
-                plus_button_selectors = [
-                    "button:has-text('+')",
-                    ".increment-button",
-                    ".quantity-plus",
-                    "[data-testid='increment']"
-                ]
-                
-                for selector in plus_button_selectors:
-                    plus_button = await page.query_selector(selector)
-                    if plus_button:
-                        logger.info(f"Found plus button with selector: {selector}")
-                        
-                        # Default quantity is usually 1, so click (quantity-1) times
-                        for _ in range(quantity - 1):
-                            await plus_button.click()
-                            await asyncio.sleep(0.2)  # Short delay between clicks
-                        
-                        quantity_set = True
-                        logger.info(f"Set quantity to {quantity} via plus button")
-                        await human_delay()
-                        await take_screenshot(page, "after_quantity_buttons.png")
+            for selector in seat_map_indicators:
+                try:
+                    map_element = await page.query_selector(selector)
+                    if map_element:
+                        logger.info(f"Seat map detected with selector: {selector}")
+                        seat_map_detected = True
                         break
+                except Exception:
+                    pass
+            
+            if seat_map_detected:
+                logger.info("Using seat map selection flow")
+                
+                # Try our dedicated seat map selection function
+                seat_selection_result = await select_seat_from_map(page)
+                if seat_selection_result:
+                    logger.info("Successfully selected seats from seat map")
+                else:
+                    logger.warning("Failed to select seats from seat map, will try standard checkout flow")
+            else:
+                logger.info("No seat map detected, using standard checkout flow")
         except Exception as e:
-            logger.warning(f"Error setting quantity: {str(e)}")
+            logger.error(f"Error checking for seat map: {str(e)}")
         
-        # Look for add to cart button or proceed button
-        add_to_cart_success = False
-        try:
-            logger.info("Looking for add to cart button")
-            
-            # Common add to cart button selectors
-            cart_button_selectors = [
-                "button:has-text('Add to Cart')",
-                "button:has-text('Añadir al Carrito')",
-                "button:has-text('Add to cart')",
-                "button:has-text('Añadir')",
-                "button.add-to-cart",
-                "[data-testid='add-to-cart']",
-                "button.addtocart",
-                "button:has-text('BOLETOS')",
-                "button:has-text('Tickets')",
-                "button:has-text('Continue')",
-                "button:has-text('Continuar')",
-                "a:has-text('Add to Cart')",
-                "a:has-text('Añadir al Carrito')"
-            ]
-            
-            for selector in cart_button_selectors:
-                cart_button = await page.query_selector(selector)
-                if cart_button:
-                    logger.info(f"Found add to cart button with selector: {selector}")
-                    await cart_button.click()
-                    logger.info("Clicked Add to Cart button")
-                    add_to_cart_success = True
-                    await take_screenshot(page, "after_add_to_cart.png")
-                    
-                    # Wait for navigation or confirmation
-                    try:
-                        await page.wait_for_load_state("networkidle", timeout=10000)
-                    except Exception as e:
-                        logger.warning(f"Wait for navigation after add to cart timed out: {str(e)}")
-                    
-                    # Add human delay
-                    await human_delay()
-                    break
-            
-            if not add_to_cart_success:
-                logger.warning("Could not find add to cart button with standard selectors")
-                
-                # If we couldn't find a standard add to cart button, try to navigate to cart page directly
-                cart_info = await navigate_to_cart(page, event_url)
-                if cart_info and 'cart_url' in cart_info and cart_info['cart_url']:
-                    add_to_cart_success = True
-                    await take_screenshot(page, "after_navigate_to_cart.png")
-        except Exception as e:
-            logger.error(f"Error adding to cart: {str(e)}")
+        # Continue with checkout flow 
+        logger.info("Proceeding with checkout navigation")
+        checkout_result = await navigate_to_checkout(page)
         
-        # If add to cart was successful, proceed to checkout if auto_checkout is enabled
-        if add_to_cart_success:
-            # Try to verify we're on a cart page
-            is_cart = await verify_cart_page(page)
+        if checkout_result and checkout_result.get('success'):
+            logger.info("Successfully navigated to checkout with tickets")
+        else:
+            logger.warning("Navigate to checkout did not report success")
             
-            if is_cart:
-                # Get the current URL (could be redirect to cart)
-                current_url = page.url
-                logger.info(f"Current URL after adding to cart: {current_url}")
-                
-                # Try to extract additional information from the cart page
-                cart_info = await extract_cart_info(page)
-                
-                # Complete with auto-checkout if enabled
-                if auto_checkout:
-                    logger.info("Auto-checkout is enabled, proceeding to checkout")
-                    
-                    checkout_success = False
-                    try:
-                        # Look for checkout button with various selectors
-                        checkout_button_selectors = [
-                            "a:has-text('Checkout')",
-                            "button:has-text('Checkout')",
-                            "a:has-text('Proceed to Checkout')",
-                            "button:has-text('Proceed to Checkout')",
-                            "a:has-text('Complete Purchase')",
-                            "button:has-text('Complete Purchase')",
-                            "a.checkout-button",
-                            "button.checkout-button",
-                            "[data-testid='checkout']"
-                        ]
-                        
-                        for selector in checkout_button_selectors:
-                            checkout_button = await page.query_selector(selector)
-                            if checkout_button:
-                                logger.info(f"Found checkout button with selector: {selector}")
-                                await checkout_button.click()
-                                logger.info("Clicked Checkout button")
-                                checkout_success = True
-                                await take_screenshot(page, "after_checkout_click.png")
-                                
-                                # Wait for navigation
-                                try:
-                                    await page.wait_for_load_state("networkidle", timeout=10000)
-                                except Exception as e:
-                                    logger.warning(f"Wait for navigation after checkout timed out: {str(e)}")
-                                
-                                # Get the final checkout URL
-                                checkout_url = page.url
-                                logger.info(f"Checkout URL: {checkout_url}")
-                                
-                                # Update cart info with checkout URL
-                                cart_info['cart_url'] = checkout_url
-                                break
-                        
-                        if not checkout_success:
-                            logger.warning("Could not find checkout button with standard selectors")
-                    except Exception as e:
-                        logger.error(f"Error during checkout: {str(e)}")
-                
-                # Send notification with cart information
-                if cart_info and cart_info.get('cart_url'):
-                    # Enhance cart info with our known quantity
-                    if 'quantity' not in cart_info or not cart_info['quantity']:
-                        cart_info['quantity'] = quantity
-                    
-                    # Send Discord notification
-                    await send_discord_notification(cart_info)
-                    
-                    return {
-                        'success': True,
-                        'date': cart_info.get('date', 'Unknown'),
-                        'quantity': cart_info.get('quantity', quantity),
-                        'section': cart_info.get('section', 'General'),
-                        'price': cart_info.get('price'),
-                        'cart_url': cart_info.get('cart_url')
-                    }
+        # Wait for page to stabilize
+        await asyncio.sleep(3)
+        await take_screenshot(page, "after_checkout_navigation.png")
+        
+        # Step 4: Verify we're on a cart page
+        cart_verification = await verify_cart_page(page)
+        if cart_verification:
+            cart_url = page.url
+            logger.info(f"Successfully navigated to cart page at: {cart_url}")
+            result['cart_url'] = cart_url
             
-        # If we couldn't add to cart or verify cart page, return failure
-        logger.error("Could not successfully add tickets to cart")
-        await take_screenshot(page, "cart_failure.png")
-        return {
-            'success': False,
-            'date': '2025-07-19',
-            'quantity': quantity,
-            'section': 'General',
-            'cart_url': ''
-        }
+            # Extract cart details
+            try:
+                cart_items = await page.query_selector_all("div.cart-item, div.line-item, [class*='cart-item']")
+                logger.info(f"Found {len(cart_items)} items in cart")
+            except Exception as e:
+                logger.warning(f"Error extracting cart details: {str(e)}")
+        
+        # If we haven't successfully found the cart page yet, check again
+        if not cart_verification:
+            cart_verification = await verify_cart_page(page)
+            if cart_verification:
+                cart_url = page.url
+                logger.info(f"Successfully navigated to cart page at: {cart_url}")
+                result['cart_url'] = cart_url
+        
+        # If successful, send a success notification
+        if cart_verification:
+            logger.info("Sending success notification")
+            await send_success_notification(cart_url, quantity)
+            result['success'] = True
+        
+        return result
     except Exception as e:
         logger.error(f"Error during automatic cart process: {str(e)}")
-        traceback.print_exc()
-        await take_screenshot(page, "error_state.png")
-        return {
-            'success': False,
-            'date': '2025-07-19',
-            'quantity': quantity if 'quantity' in locals() else 2,
-            'section': 'General',
-            'cart_url': ''
-        }
+        await take_screenshot(page, "error_screenshot.png")
+        
+        # Send a Discord notification about the error
+        await send_discord_notification({
+            'message': f"❌ Error during automatic carting: {str(e)}",
+            'error': str(e),
+            'mention_everyone': False,
+            'success': False
+        })
+        
+        return result
 
 async def wait_for_user_action(page):
     """Keep the browser open until user closes the script with Ctrl+C"""
@@ -865,6 +1074,9 @@ async def monitor_tickets(manual_mode=False, test_mode=False, persistent_browser
             - quantity: Number of tickets to purchase (1-8)
             - auto_checkout: Whether to proceed to checkout automatically
             - best_available: Whether to select best available seats
+    
+    Returns:
+        Dictionary with cart results
     """
     # Set default options if none provided
     if options is None:
@@ -1045,7 +1257,7 @@ async def monitor_tickets(manual_mode=False, test_mode=False, persistent_browser
                 logger.info("SUCCESS! Tickets added to cart. Notification sent. Monitoring complete.")
                 print("\n==================================================")
                 print("          TICKETS SUCCESSFULLY ADDED TO CART!      ")
-                print("==================================================")
+                print("==================================================\n")
                 print(f"Event Date: {event_date}")
                 print(f"Cart URL: {result.get('cart_url', 'N/A')}")
                 print(f"Section: {result.get('section', 'N/A')}")

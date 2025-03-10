@@ -892,7 +892,7 @@ def update_ticket_status():
             
             # Only send Discord notification if the status changed significantly
             if previous_status != status:
-                logger.info(f"Status change for {event_id}: {previous_status} -> {status}")
+                logger.info(f"Status change for {event_id}: {previous_status} → {status}")
                 
                 # Only notify for certain status changes (to avoid notification spam)
                 should_notify = (
@@ -1174,13 +1174,8 @@ def start_cart_api():
             "error": str(e)
         })
 
-@app.route('/api/tickets')
-def get_tickets():
-    """API endpoint to get ticket status"""
-    return jsonify(ticket_status)
-
-@app.route('/api/cart-status')
-def get_cart_status():
+@app.route('/api/cart-status-detailed')
+def get_cart_status_detailed():
     """API endpoint to get status of active cart processes"""
     event_id = request.args.get('event_id')
     

@@ -35,6 +35,9 @@ BAD_BUNNY_DATES = {
     "september": ["05", "06", "07", "12", "13", "14"]
 }
 
+# Test configuration
+TEST_CHECKOUT_URL = "https://shop.ticketera.com/checkout/67be0fb1c3855d04ea54843e"
+
 def send_discord_notification(message, use_mentions=False):
     """Send a notification to Discord webhook"""
     if use_mentions:
@@ -56,7 +59,7 @@ def send_discord_notification(message, use_mentions=False):
     except Exception as e:
         logger.error(f"Error sending Discord notification: {e}")
 
-def simulate_cart_success(event_id, event_name, checkout_url="https://choli.ticketera.com/checkout/"):
+def simulate_cart_success(event_id, event_name, checkout_url=TEST_CHECKOUT_URL):
     """Simulate a successful cart operation"""
     logger.info(f"Simulating successful cart for: {event_name}")
     
