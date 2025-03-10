@@ -125,47 +125,126 @@ async def random_mouse_movement(page):
             await asyncio.sleep(random.uniform(0.1, 0.3))
 
 async def configure_browser_for_cloudflare(browser):
-    """Configure the browser to better avoid Cloudflare detection"""
-    if CLOUDFLARE_SETTINGS["enabled"]:
-        try:
-            # Access the browser's DevTools Protocol session
-            cdp_session = await browser.new_cdp_session()
-            
-            if CLOUDFLARE_SETTINGS["disable_webdriver"]:
-                # Attempt to disable webdriver flags that Cloudflare might detect
-                await cdp_session.execute(
-                    'Page.addScriptToEvaluateOnNewDocument',
+    """
+    Configure the browser to better avoid Cloudflare detection
+    
+    Args:
+        browser: Playwright browser instance
+    """
+    try:
+        logger.info("Configuring browser to avoid Cloudflare detection...")
+        
+        # Add more advanced evasion techniques
+        await browser.contexts[0].add_init_script("""
+        // Override webdriver properties
+        Object.defineProperty(navigator, 'webdriver', {
+            get: () => false
+        });
+        
+        // Override chrome properties
+        window.chrome = {
+            runtime: {},
+            loadTimes: function() {},
+            csi: function() {},
+            app: {},
+        };
+        
+        // Override permissions
+        if (navigator.permissions) {
+            const originalQuery = navigator.permissions.query;
+            navigator.permissions.query = function(parameters) {
+                if (parameters.name === 'notifications') {
+                    return Promise.resolve({ state: Notification.permission });
+                }
+                return originalQuery.apply(this, arguments);
+            };
+        }
+        
+        // Add plugins
+        Object.defineProperty(navigator, 'plugins', {
+            get: () => {
+                return [
                     {
-                        'source': '''
-                        Object.defineProperty(navigator, 'webdriver', {
-                            get: () => false,
-                        });
-                        
-                        // Prevent Cloudflare from detecting automation
-                        if (window.navigator.permissions) {
-                            window.navigator.permissions.query = (parameters) => {
-                                return Promise.resolve({state: 'granted'});
-                            };
-                        }
-                        
-                        // Hide the fact that we're running headless
-                        Object.defineProperty(navigator, 'plugins', {
-                            get: () => [1, 2, 3, 4, 5],
-                        });
-                        
-                        // Override the languages
-                        Object.defineProperty(navigator, 'languages', {
-                            get: () => ['en-US', 'en', 'es'],
-                        });
-                        '''
+                        0: {type: "application/pdf"},
+                        description: "Portable Document Format",
+                        filename: "internal-pdf-viewer",
+                        length: 1,
+                        name: "Chrome PDF Plugin"
+                    },
+                    {
+                        0: {type: "application/pdf"},
+                        description: "Portable Document Format",
+                        filename: "internal-pdf-viewer",
+                        length: 1,
+                        name: "Chrome PDF Viewer"
+                    },
+                    {
+                        0: {type: "application/x-google-chrome-pdf"},
+                        description: "Portable Document Format",
+                        filename: "internal-pdf-viewer",
+                        length: 1,
+                        name: "Chrome PDF Viewer"
+                    },
+                    {
+                        0: {type: "application/x-nacl"},
+                        description: "Native Client",
+                        filename: "internal-nacl-plugin",
+                        length: 1,
+                        name: "Native Client"
                     }
-                )
-            
-            logger.info("Browser configured to avoid Cloudflare detection")
-            return True
-        except Exception as e:
-            logger.warning(f"Failed to configure browser for Cloudflare: {str(e)}")
-            return False
+                ];
+            }
+        });
+        
+        // Add languages
+        Object.defineProperty(navigator, 'languages', {
+            get: () => ['en-US', 'en', 'es'],
+        });
+        
+        // Add hardware concurrency
+        Object.defineProperty(navigator, 'hardwareConcurrency', {
+            get: () => 8,
+        });
+        
+        // Delete known automation flags
+        delete window.cdc_adoQpoasnfa76pfcZLmcfl_Array;
+        delete window.cdc_adoQpoasnfa76pfcZLmcfl_Promise;
+        delete window.cdc_adoQpoasnfa76pfcZLmcfl_Symbol;
+        """)
+        
+        # Randomized user agent
+        user_agents = [
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Edge/123.0.0.0",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:124.0) Gecko/20100101 Firefox/124.0",
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15"
+        ]
+        
+        # Set headers to mimic a real browser
+        await browser.contexts[0].set_extra_http_headers({
+            "Accept-Language": "en-US,en;q=0.9,es;q=0.8",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+            "sec-ch-ua": '"Google Chrome";v="123", "Not:A-Brand";v="8", "Chromium";v="123"',
+            "sec-ch-ua-mobile": "?0",
+            "sec-ch-ua-platform": "\"Windows\"",
+            "sec-fetch-dest": "document",
+            "sec-fetch-mode": "navigate",
+            "sec-fetch-site": "none",
+            "sec-fetch-user": "?1",
+            "upgrade-insecure-requests": "1"
+        })
+        
+        # Add cookies that might help bypass Cloudflare
+        await browser.contexts[0].add_cookies([
+            {"name": "cf_clearance", "value": "", "domain": ".ticketera.com", "path": "/"},
+            {"name": "preferred_locale", "value": "en", "domain": ".ticketera.com", "path": "/"}
+        ])
+        
+        logger.info("Browser configured to avoid WebDriver detection")
+        
+    except Exception as e:
+        logger.error(f"Error configuring browser for Cloudflare: {str(e)}")
 
 async def send_discord_notification(cart_info):
     """Send a notification to Discord with cart information"""
@@ -763,132 +842,145 @@ async def navigate_to_checkout(page):
 
 async def select_seat_from_map(page):
     """
-    Function to specifically handle seat selection from a seat map interface
+    Select an available seat from the seat map.
     
-    Steps:
-    1. Wait for seat map to fully load
-    2. Identify available seats (blue or green circles)
-    3. Click on available seat
-    4. Handle pop-up with seat details
-    5. Confirm selection
+    Args:
+        page: Playwright page object
+        
+    Returns:
+        bool: True if a seat was successfully selected, False otherwise
     """
-    logger.info("Step 2: Selecting available seats from the map...")
-    
     try:
-        # Wait for the seat map to fully load
-        logger.info("Waiting for seat map to load completely...")
-        # Give extra time for the seat map JavaScript to initialize
-        await asyncio.sleep(5)
-        await page.wait_for_load_state('networkidle')
+        logger.info("Attempting to select a seat from the map...")
         
-        # Look for available seats (blue or green circles)
-        blue_seats_selector = "circle[fill='#4a89dc'], circle[fill='#5D9CEC']"
-        green_seats_selector = "circle[fill='#A0D468'], circle[fill='#8CC152']"
+        # Wait for the seat map to load
+        logger.info("Waiting for seat map to load...")
+        await page.wait_for_load_state("networkidle")
         
-        # Additional fallback selectors for different seat types
-        gray_seats_selector = "circle[fill='#CCD1D9'], circle[fill='#AAB2BD']"  # Sometimes gray seats are actually available
-        any_circle_selector = "circle:not([fill='#E6E9ED']):not([fill='#F5F7FA'])"  # Any non-white circle
-        any_seat_selector = ".seat-selector, .seat-item, [data-testid='seat'], [role='button'][aria-label*='seat']"
+        # Allow extra time for SVG content to fully render
+        await asyncio.sleep(random.uniform(1.5, 3.0))
         
-        logger.info("Looking for available seats (blue or green circles)...")
+        # First check if we have an SVG map
+        svg_exists = await is_element_visible(page, "svg")
+        if not svg_exists:
+            logger.warning("No SVG seat map found, taking screenshot for debugging...")
+            await take_screenshot(page, "no_svg_map.png")
+            return False
         
-        # Check for blue seats first (usually cheaper)
-        has_blue_seats = await page.locator(blue_seats_selector).count() > 0
-        logger.info(f"Blue seats available: {has_blue_seats}")
+        logger.info("SVG seat map detected, looking for available seats...")
         
-        # Then check for green seats
-        has_green_seats = await page.locator(green_seats_selector).count() > 0
-        logger.info(f"Green seats available: {has_green_seats}")
-        
-        # If no blue or green seats, check for gray seats
-        has_gray_seats = False
-        if not has_blue_seats and not has_green_seats:
-            has_gray_seats = await page.locator(gray_seats_selector).count() > 0
-            logger.info(f"Gray seats available: {has_gray_seats}")
-        
-        # Try to select a seat based on availability
-        seat_selected = False
-        section_info = ""
-        
-        # First try blue seats
-        if has_blue_seats:
-            logger.info("Selecting blue seat...")
-            blue_seat = await page.locator(blue_seats_selector).first
-            await blue_seat.click()
-            seat_selected = True
-            section_info = "Blue section"
-        # Then try green seats
-        elif has_green_seats:
-            logger.info("Selecting green seat...")
-            green_seat = await page.locator(green_seats_selector).first
-            await green_seat.click()
-            seat_selected = True
-            section_info = "Green section"
-        # Then try gray seats as a fallback
-        elif has_gray_seats:
-            logger.info("Selecting gray seat (fallback)...")
-            gray_seat = await page.locator(gray_seats_selector).first
-            await gray_seat.click()
-            seat_selected = True
-            section_info = "Gray section"
-        # Last resort: try any circle that might be a seat
-        else:
-            # Check if there are any clickable circles
-            any_circles = await page.locator(any_circle_selector).count() > 0
-            if any_circles:
-                logger.info("Attempting to select any available circle...")
-                await page.locator(any_circle_selector).first.click()
-                seat_selected = True
-                section_info = "Unknown section"
-            # If no circles, try any element that might be a seat
-            else:
-                any_seats = await page.locator(any_seat_selector).count() > 0
-                if any_seats:
-                    logger.info("Attempting to select any seat element...")
-                    await page.locator(any_seat_selector).first.click()
-                    seat_selected = True
-                    section_info = "Unknown section"
-                else:
-                    logger.warning("No available seats (blue, green, or fallback) found on the map")
-                    await page.screenshot(path="no_available_seats.png")
-                    return False, ""
-        
-        # Wait for popup to confirm selection
-        logger.info("Waiting for confirmation popup after seat selection...")
-        popup_confirmations = [
-            "button:has-text('Confirmar')",
-            "button:has-text('Confirm')",
-            "button:has-text('Select')",
-            "button:has-text('Add to Cart')",
-            "[data-testid='confirm-button']",
-            ".confirm-button",
-            "button.btn-primary",
-            "button.confirm-selection"
+        # Different selectors for available seats
+        seat_selectors = [
+            "circle[fill='#4a89dc'], circle[fill='#5D9CEC']",  # Blue seats
+            "circle[fill='#A0D468'], circle[fill='#8CC152']",  # Green seats
+            "circle[fill='#8067dc'], circle[fill='#967ADC']",  # Purple seats
+            "path[fill='#4a89dc'], path[fill='#5D9CEC']",      # Blue seat paths
+            "path[fill='#A0D468'], path[fill='#8CC152']",      # Green seat paths
+            "path[fill='#8067dc'], path[fill='#967ADC']"       # Purple seat paths
         ]
         
-        for selector in popup_confirmations:
-            try:
-                if await page.locator(selector).count() > 0:
-                    logger.info(f"Found confirmation button with selector: {selector}")
-                    await page.locator(selector).click()
-                    await page.wait_for_timeout(1000)  # Wait for the click to register
-                    break
-            except Exception as e:
-                logger.warning(f"Couldn't click confirmation button with selector {selector}: {str(e)}")
-        
-        # Take screenshot of the result
-        await page.screenshot(path="seat_selection_result.png")
-        
-        return seat_selected, section_info
+        # Try each seat selector
+        for seat_selector in seat_selectors:
+            # Check if seats with this selector exist
+            seats = await page.query_selector_all(seat_selector)
+            if seats and len(seats) > 0:
+                logger.info(f"Found {len(seats)} available seats with selector: {seat_selector}")
+                
+                # Add a realistic pause before selecting a seat (like a human would look at the map)
+                await asyncio.sleep(random.uniform(0.8, 2.0))
+                
+                # Choose a random seat from the first 10 (or less if fewer are available)
+                max_index = min(10, len(seats))
+                selected_index = random.randint(0, max_index - 1)
+                selected_seat = seats[selected_index]
+                
+                # Get the seat position for more human-like mouse movement
+                bounding_box = await selected_seat.bounding_box()
+                if bounding_box:
+                    # Move mouse progressively towards the seat
+                    await page.mouse.move(
+                        random.randint(0, int(page.viewport_size['width'] / 2)),
+                        random.randint(0, int(page.viewport_size['height'] / 2))
+                    )
+                    await asyncio.sleep(random.uniform(0.1, 0.3))
+                    
+                    # Move closer
+                    await page.mouse.move(
+                        int(bounding_box['x'] / 1.5),
+                        int(bounding_box['y'] / 1.5)
+                    )
+                    await asyncio.sleep(random.uniform(0.1, 0.3))
+                    
+                    # Finally move to the seat with slightly random position within the seat
+                    await page.mouse.move(
+                        bounding_box['x'] + bounding_box['width'] / 2 + random.randint(-3, 3),
+                        bounding_box['y'] + bounding_box['height'] / 2 + random.randint(-3, 3)
+                    )
+                    await asyncio.sleep(random.uniform(0.2, 0.4))
+                
+                # Now click the seat with a human-like delay
+                await selected_seat.click()
+                logger.info(f"Clicked on seat at index {selected_index}")
+                
+                # Wait for the potential popup or confirmation dialog
+                await asyncio.sleep(random.uniform(0.5, 1.5))
+                
+                # Check for confirmation dialog or popup
+                confirm_selectors = [
+                    "button:has-text('Confirm')",
+                    "button:has-text('Confirmar')",
+                    "button:has-text('Add to Cart')",
+                    "button:has-text('Añadir al carrito')",
+                    "button:has-text('Continue')",
+                    "button:has-text('Continuar')",
+                    "button:has-text('Select')",
+                    "button:has-text('Seleccionar')",
+                    ".confirm-button",
+                    ".btn-primary",
+                    ".btn-confirm"
+                ]
+                
+                # Try each confirmation selector with a slight delay
+                for confirm_selector in confirm_selectors:
+                    confirm_button = await page.query_selector(confirm_selector)
+                    if confirm_button:
+                        logger.info(f"Found confirmation button with selector: {confirm_selector}")
+                        await asyncio.sleep(random.uniform(0.3, 0.8))
+                        
+                        # Move mouse to the button naturally
+                        button_box = await confirm_button.bounding_box()
+                        if button_box:
+                            await page.mouse.move(
+                                button_box['x'] + button_box['width'] / 2 + random.randint(-5, 5),
+                                button_box['y'] + button_box['height'] / 2 + random.randint(-3, 3)
+                            )
+                            await asyncio.sleep(random.uniform(0.2, 0.4))
+                        
+                        # Click the confirmation button
+                        await confirm_button.click()
+                        logger.info("Clicked confirmation button")
+                        await asyncio.sleep(random.uniform(0.5, 1.0))
+                        await page.wait_for_load_state("networkidle")
+                        return True
+                
+                # If we clicked a seat but couldn't find a confirmation button, 
+                # the seat might have been auto-selected
+                logger.info("No confirmation button found, but seat may have been selected")
+                return True
+                
+        # If we got here, we couldn't find any available seats
+        logger.warning("No available seats found on the map")
+        await take_screenshot(page, "no_available_seats.png")
+        return False
         
     except Exception as e:
-        logger.error(f"Error selecting seat: {str(e)}")
-        await page.screenshot(path="seat_selection_error.png")
-        return False, ""
+        logger.error(f"Error selecting seat from map: {str(e)}")
+        await take_screenshot(page, "seat_selection_error.png")
+        return False
 
 async def automatic_cart_process(page, event_url, options=None):
     """
-    Automated process for selecting seats and adding them to cart
+    Main function to run the automated cart process
     
     Args:
         page: Playwright page object
@@ -897,184 +989,139 @@ async def automatic_cart_process(page, event_url, options=None):
             - quantity: Number of tickets to purchase (1-8)
             - auto_checkout: Whether to proceed to checkout automatically
             - best_available: Whether to select best available seats
-    
+            - event_date: Date of the event for notification purposes
+            
     Returns:
-        Dictionary with cart results
+        Dictionary with cart result information
     """
-    logger.info(f"Starting automatic carting process for: {event_url}")
-    
     try:
-        # Extract options
-        quantity = options.get('quantity', 2) if options else 2
-        auto_checkout = options.get('auto_checkout', False) if options else False
-        best_available = options.get('best_available', True) if options else True
-        event_date = options.get('event_date', 'Event') if options else 'Event'
+        # Parse options or use defaults
+        if not options:
+            options = {}
         
-        # Initialize result dictionary
-        result = {
-            "success": False,
-            "message": "",
-            "section": "",
-            "quantity": quantity,
-            "price": "",
-            "cart_url": "",
-            "screenshot_path": ""
-        }
+        quantity = options.get('quantity', 2)
+        auto_checkout = options.get('auto_checkout', False)
+        best_available = options.get('best_available', False)
+        event_date = options.get('event_date', 'Unknown Date')
         
-        # Step 1: Open the event page
+        logger.info(f"Starting automatic cart process for event: {event_url}")
+        logger.info(f"Options: quantity={quantity}, auto_checkout={auto_checkout}, best_available={best_available}")
+        
+        # Start with the event page
         logger.info("Step 1: Opening event page...")
-        logger.info(f"Navigating to {event_url}")
         await page.goto(event_url, wait_until='domcontentloaded')
+        await page.wait_for_load_state('networkidle')
         
-        # Take screenshot for debugging
-        await take_screenshot(page, "step1_event_page.png")
+        # Take an initial screenshot
+        await take_screenshot(page, "01_event_page.png")
         
-        # Step 2: Determine if this is a direct checkout link or event page
-        logger.info("Step 2: Determining page type...")
-        
-        is_direct_checkout = "shop.ticketera.com/checkout" in event_url
-        
-        if is_direct_checkout:
-            logger.info("Detected direct checkout link, processing...")
-            # Handle direct checkout page
-            result = await process_direct_checkout(page, quantity, event_date)
-        else:
-            # Regular event page flow
-            logger.info("Waiting for seat map to load completely...")
+        # Try to select best available if specified
+        if best_available:
+            logger.info("Attempting to select best available seats...")
+            best_available_success = await select_best_available(page, quantity)
             
-            # Check if we need to wait for the seat map to load
-            await page.wait_for_load_state('networkidle')
-            
-            seat_map_visible = await is_element_visible(page, "#seats .seat-map")
-            
-            if seat_map_visible:
-                # Step 3: Select seats from the map
-                logger.info("Step 3: Selecting available seats from the map...")
-                seat_selected = await select_seat_from_map(page)
-                
-                if not seat_selected:
-                    logger.warning("Failed to select seats from map, trying alternative options...")
-                    # Try the "Best Available" option if enabled
-                    if best_available:
-                        logger.info("Trying 'Best Available' option...")
-                        seat_selected = await select_best_available(page, quantity)
-                    
-                    if not seat_selected:
-                        await take_screenshot(page, "failed_seat_selection.png")
-                        result["message"] = "Failed to select any available seats"
-                        return result
-                
-                # Step 4: Set quantity if needed
-                logger.info(f"Step 4: Setting quantity to {quantity}...")
-                await set_quantity(page, quantity)
-                
-                # Step 5: Handle any popups
-                logger.info("Step 5: Handling popups...")
-                await handle_popup(page)
+            if best_available_success:
+                logger.info("Successfully selected best available seats!")
             else:
-                # Try alternative approaches if seat map is not visible
-                logger.info("Seat map not detected, trying alternative approaches...")
-                
-                # Check if we have a section list instead
-                sections_visible = await is_element_visible(page, ".sections-list")
-                if sections_visible:
-                    logger.info("Section list detected, selecting a section...")
-                    section_selected = await select_section(page)
-                    
-                    if section_selected:
-                        # Now we should have a seat map loaded
-                        logger.info("Section selected, now selecting seats...")
-                        seat_selected = await select_seat_from_map(page)
-                        
-                        # Set quantity after selecting section
-                        await set_quantity(page, quantity)
-                    else:
-                        logger.warning("Failed to select a section")
-                        result["message"] = "Failed to select a section"
-                        return result
-                else:
-                    # Try Best Available option as a fallback
-                    logger.info("Trying 'Best Available' option as fallback...")
-                    seat_selected = await select_best_available(page, quantity)
-                    
-                    if not seat_selected:
-                        logger.warning("Failed to select any available seats through all methods")
-                        result["message"] = "No available seats found through any method"
-                        return result
-            
-            # Step 6: Click the add to cart or checkout button
-            logger.info("Step 6: Adding to cart...")
-            cart_success = await add_to_cart(page)
-            
-            if not cart_success:
-                logger.warning("Failed to add tickets to cart")
-                result["message"] = "Failed to add tickets to cart"
-                return result
+                logger.info("Could not select best available seats, trying seat map...")
         
-        # Step 7: Extract cart information and take screenshot
-        logger.info("Step 7: Extracting cart information...")
-        cart_info = await extract_cart_info(page)
+        # If best available didn't work or wasn't specified, try the seat map
+        if not best_available or not best_available_success:
+            # Try to select seats from the map
+            logger.info("Step 2: Selecting seats from the map...")
+            seat_selected = await select_seat_from_map(page)
+            
+            if not seat_selected:
+                logger.warning("Could not select seats from map")
+                await take_screenshot(page, "no_seats_selected.png")
+                return {
+                    'success': False,
+                    'error': 'Could not select seats from map',
+                    'cart_url': '',
+                    'checkout_url': ''
+                }
         
-        if cart_info:
-            result["success"] = True
-            result["section"] = cart_info.get("section", "")
-            result["price"] = cart_info.get("price", "")
-            result["cart_url"] = page.url
-            result["message"] = "Tickets added to cart successfully"
+        # Add selected tickets to cart
+        logger.info("Step 3: Adding tickets to cart...")
+        cart_result = await add_to_cart(page)
+        
+        if not cart_result['success']:
+            logger.warning("Could not add tickets to cart")
+            await take_screenshot(page, "add_to_cart_failed.png")
+            return cart_result
+        
+        logger.info(f"Successfully added tickets to cart! Cart URL: {cart_result['cart_url']}")
+        
+        # If auto checkout is enabled, proceed to checkout
+        if auto_checkout and cart_result['success'] and not cart_result.get('checkout_url'):
+            logger.info("Step 4: Proceeding to checkout...")
+            checkout_success = await proceed_to_checkout(page)
             
-            # Take screenshot of successful cart
-            screenshot_path = "successful_cart.png"
-            await take_screenshot(page, screenshot_path)
-            result["screenshot_path"] = screenshot_path
+            if checkout_success:
+                logger.info("Successfully proceeded to checkout!")
+                cart_result['checkout_url'] = page.url
+            else:
+                logger.warning("Could not proceed to checkout")
+                await take_screenshot(page, "proceed_to_checkout_failed.png")
+        
+        # Send notification with detailed information
+        try:
+            # Get section and price info if available
+            section_info = ""
+            price_info = ""
             
-            # Send a Discord notification about the successful cart
-            logger.info("Sending cart notification...")
             try:
-                send_cart_notification(
-                    event_date=event_date,
-                    quantity=quantity,
-                    section=result["section"],
-                    price=result["price"],
-                    cart_url=result["cart_url"]
-                )
-            except Exception as e:
-                logger.error(f"Error sending cart notification: {str(e)}")
-            
-            # Step 8: Proceed to checkout if auto_checkout is enabled
-            if auto_checkout:
-                logger.info("Step 8: Proceeding to checkout...")
-                checkout_success = await proceed_to_checkout(page)
+                # Look for section information
+                section_elements = await page.query_selector_all("div:has-text('Section'), div:has-text('Sección'), span:has-text('Section'), span:has-text('Sección')")
+                if section_elements and len(section_elements) > 0:
+                    section_text = await section_elements[0].text_content()
+                    section_parts = section_text.split(':')
+                    if len(section_parts) > 1:
+                        section_info = section_parts[1].strip()
+                    else:
+                        section_info = section_text.strip()
                 
-                if checkout_success:
-                    logger.info("Successfully proceeded to checkout")
-                    result["message"] += ", and proceeded to checkout"
-                else:
-                    logger.warning("Failed to proceed to checkout, but tickets are in cart")
-                    result["message"] += ", but failed to proceed to checkout"
+                # Look for price information
+                price_elements = await page.query_selector_all("div:has-text('Price'), div:has-text('Precio'), span:has-text('Price'), span:has-text('Precio')")
+                if price_elements and len(price_elements) > 0:
+                    price_text = await price_elements[0].text_content()
+                    price_parts = price_text.split(':')
+                    if len(price_parts) > 1:
+                        price_info = price_parts[1].strip()
+                    else:
+                        price_info = price_text.strip()
+            except Exception as info_error:
+                logger.warning(f"Error getting section/price info: {str(info_error)}")
             
-            logger.info(f"Cart process completed successfully. Cart URL: {result['cart_url']}")
-        else:
-            logger.warning("Failed to extract cart information")
-            result["message"] = "Tickets may be in cart, but failed to extract cart information"
-            result["cart_url"] = page.url
+            # Create detailed notification data
+            notification_data = {
+                'success': True,
+                'message': f"Successfully added {quantity} tickets to cart for {event_date}!",
+                'url': cart_result.get('cart_url', ''),
+                'event_date': event_date,
+                'quantity': quantity,
+                'section': section_info,
+                'price': price_info,
+                'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            }
+            
+            # Send detailed notification
+            await send_discord_notification(notification_data)
+            
+        except Exception as notification_error:
+            logger.error(f"Error sending notification: {str(notification_error)}")
         
-        return result
+        # Return the cart result
+        return cart_result
         
     except Exception as e:
         logger.error(f"Error in automatic cart process: {str(e)}")
-        logger.error(traceback.format_exc())
-        
-        # Take screenshot for debugging
-        await take_screenshot(page, "cart_error.png")
-        
+        await take_screenshot(page, "automatic_cart_error.png")
         return {
-            "success": False,
-            "message": f"Error: {str(e)}",
-            "section": "",
-            "quantity": quantity if 'quantity' in locals() else 2,
-            "price": "",
-            "cart_url": page.url,
-            "screenshot_path": "cart_error.png"
+            'success': False,
+            'error': f"Error in automatic cart process: {str(e)}",
+            'cart_url': '',
+            'checkout_url': ''
         }
 
 async def process_direct_checkout(page, quantity, event_date):
@@ -1321,63 +1368,55 @@ async def monitor_tickets(manual_mode=False, test_mode=False, persistent_browser
     async with async_playwright() as playwright:
         if persistent_browser:
             print("\nLaunching browser for persistent session...")
-            browser = await playwright.chromium.launch(headless=False)
+            browser_launch_options = {
+                "headless": False,  # Use headed mode to appear more human-like
+                "channel": "chrome",  # Use Chrome channel which is less likely to be detected
+                "args": [
+                    "--no-sandbox",
+                    "--disable-setuid-sandbox",
+                    "--disable-infobars",
+                    "--window-size=1920,1080",
+                    "--start-maximized",
+                    "--disable-extensions",
+                    "--disable-blink-features=IsolateOrigins,site-per-process",
+                    "--ignore-certificate-errors",
+                    "--disable-web-security",
+                    "--allow-running-insecure-content"
+                ],
+                "ignore_default_args": ["--enable-automation"]
+            }
+            browser = await playwright.chromium.launch(**browser_launch_options)
             
-            # Configure browser to avoid Cloudflare detection
-            if CLOUDFLARE_SETTINGS["enabled"]:
-                try:
-                    # Alternative configuration for Cloudflare evasion
-                    context = await browser.new_context(
-                        viewport={"width": 1280, "height": 800},
-                        user_agent=HUMAN_HEADERS["user-agent"],
-                        locale="en-US",
-                        timezone_id="America/New_York",
-                        geolocation={"latitude": 40.7128, "longitude": -74.0060},
-                        permissions=["geolocation"]
-                    )
-                    
-                    # Inject script to evade detection
-                    await context.add_init_script("""
-                        Object.defineProperty(navigator, 'webdriver', {
-                            get: () => false,
-                        });
-                        
-                        // Prevent Cloudflare from detecting automation
-                        if (window.navigator.permissions) {
-                            window.navigator.permissions.query = (parameters) => {
-                                return Promise.resolve({state: 'granted'});
-                            };
-                        }
-                        
-                        // Hide the fact that we're running headless
-                        Object.defineProperty(navigator, 'plugins', {
-                            get: () => [1, 2, 3, 4, 5],
-                        });
-                        
-                        // Override the languages
-                        Object.defineProperty(navigator, 'languages', {
-                            get: () => ['en-US', 'en', 'es'],
-                        });
-                    """)
-                    
-                    logger.info("Browser configured to avoid Cloudflare detection")
-                except Exception as e:
-                    logger.warning(f"Failed to configure browser for Cloudflare: {str(e)}")
-                    # Fall back to standard context creation
-                    context = await browser.new_context(
-                        viewport={"width": 1280, "height": 800},
-                        user_agent=HUMAN_HEADERS["user-agent"]
-                    )
-            else:
-                # Standard context creation
-                context = await browser.new_context(
-                    viewport={"width": 1280, "height": 800},
-                    user_agent=HUMAN_HEADERS["user-agent"]
-                )
+            # Create a context with randomized device parameters to appear more human
+            context = await browser.new_context(
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+                locale="en-US",
+                timezone_id="America/New_York",
+                permissions=["geolocation", "notifications"],
+                color_scheme="light",
+                device_scale_factor=1.0 + (random.random() * 0.3)  # Slight randomization
+            )
             
-            # Set extra HTTP headers for human-like behavior
-            if CLOUDFLARE_SETTINGS["use_human_headers"]:
-                await context.set_extra_http_headers(HUMAN_HEADERS)
+            # Configure the context to avoid detection
+            await configure_browser_for_cloudflare(browser)
+            
+            # Add additional human-like behaviors
+            await context.add_init_script("""
+                // Add random timing jitter to events
+                const originalAddEventListener = EventTarget.prototype.addEventListener;
+                EventTarget.prototype.addEventListener = function(type, listener, options) {
+                    if (type === 'mousemove' || type === 'mousedown' || type === 'mouseup' || type === 'click') {
+                        const wrapped = function(...args) {
+                            // Add small random delay to simulate human reaction time
+                            setTimeout(() => {
+                                listener.apply(this, args);
+                            }, Math.random() * 20);
+                        };
+                        return originalAddEventListener.call(this, type, wrapped, options);
+                    }
+                    return originalAddEventListener.call(this, type, listener, options);
+                };
+            """)
             
             page = await context.new_page()
             logger.info("Persistent browser launched and ready")
@@ -1420,8 +1459,7 @@ async def monitor_tickets(manual_mode=False, test_mode=False, persistent_browser
                 
                 # Create context with human-like properties
                 temp_context = await temp_browser.new_context(
-                    viewport={"width": 1280, "height": 800},
-                    user_agent=HUMAN_HEADERS["user-agent"],
+                    user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
                     locale="en-US",
                     timezone_id="America/New_York",
                     geolocation={"latitude": 40.7128, "longitude": -74.0060},
@@ -1462,7 +1500,7 @@ async def monitor_tickets(manual_mode=False, test_mode=False, persistent_browser
                     print("\nKeeping browser open. You can continue to use it.")
                     await wait_for_manual_trigger()
                 
-                break
+                return result
             
             # If not successful, wait and try again
             attempt += 1
@@ -1488,137 +1526,13 @@ async def monitor_tickets(manual_mode=False, test_mode=False, persistent_browser
             print("\nAll attempts completed but keeping browser open.")
             print("Press Ctrl+C to close the browser and exit the script.")
             await wait_for_manual_trigger()
-
-def send_cart_notification(event_date, quantity, section, price, cart_url):
-    """
-    Send a Discord notification when tickets are successfully added to cart
-    
-    Args:
-        event_date: Date of the event
-        quantity: Number of tickets
-        section: Section of the tickets
-        price: Price of the tickets (if available)
-        cart_url: URL to the cart
-    """
-    try:
-        webhook_url = os.environ.get('DISCORD_WEBHOOK_URL')
-        if not webhook_url:
-            logger.warning("No Discord webhook URL found in environment variables")
-            return
-            
-        logger.info("Sending Discord notification...")
-        
-        # Format the price nicely if available
-        price_text = f"Price: {price}" if price else "Price: Not available"
-        
-        # Prepare the embed for Discord
-        embed = {
-            "title": "🎟️ TICKETS SUCCESSFULLY CARTED! 🎟️",
-            "description": "Tickets have been successfully added to your cart! Click the button below to complete your purchase.",
-            "color": 5814783,  # Green color
-            "fields": [
-                {
-                    "name": "📅 Event Date",
-                    "value": str(event_date),
-                    "inline": True
-                },
-                {
-                    "name": "🎫 Quantity",
-                    "value": str(quantity),
-                    "inline": True
-                },
-                {
-                    "name": "📍 Section",
-                    "value": section if section else "Not specified",
-                    "inline": True
-                },
-                {
-                    "name": "💰 Price",
-                    "value": price_text,
-                    "inline": True
-                },
-                {
-                    "name": "⏱️ Time Remaining",
-                    "value": "⚠️ Complete your purchase ASAP! Cart may expire in 10-15 minutes.",
-                    "inline": False
-                }
-            ],
-            "footer": {
-                "text": f"TOVK Band Auto-Cart System • {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}"
-            }
-        }
-        
-        # Create a message with a button link to the cart
-        message = {
-            "content": "@everyone **TICKETS FOUND AND CARTED!** Complete your purchase immediately!",
-            "embeds": [embed],
-            "components": [
-                {
-                    "type": 1,
-                    "components": [
-                        {
-                            "type": 2,
-                            "style": 5,  # Link button
-                            "label": "🔗 GO TO CART",
-                            "url": cart_url
-                        }
-                    ]
-                }
-            ]
-        }
-        
-        # Add step-by-step checkout instructions
-        instructions_embed = {
-            "title": "📋 Checkout Instructions",
-            "description": "Follow these steps to complete your purchase:",
-            "color": 16776960,  # Yellow color
-            "fields": [
-                {
-                    "name": "Step 1",
-                    "value": "Sign in to your Ticketera account (if not already signed in)",
-                    "inline": False
-                },
-                {
-                    "name": "Step 2",
-                    "value": "Verify your ticket selection and quantity",
-                    "inline": False
-                },
-                {
-                    "name": "Step 3",
-                    "value": "Enter payment information and complete purchase",
-                    "inline": False
-                },
-                {
-                    "name": "Step 4",
-                    "value": "Save/screenshot your confirmation page and order number",
-                    "inline": False
-                }
-            ]
-        }
-        
-        # Add the instructions embed to the message
-        message["embeds"].append(instructions_embed)
-        
-        # Send the notification
-        headers = {'Content-Type': 'application/json'}
-        response = requests.post(webhook_url, json=message, headers=headers)
-        
-        # Send a second notification for critical changes (as per user preference)
-        duplicate_message = {
-            "content": "⚠️ **REMINDER: TICKETS IN CART - COMPLETE PURCHASE NOW!** ⚠️",
-            "embeds": [embed]
-        }
-        time.sleep(1)  # Brief delay between messages
-        requests.post(webhook_url, json=duplicate_message, headers=headers)
-        
-        if response.status_code == 204:
-            logger.info("Discord notification sent successfully")
         else:
-            logger.warning(f"Failed to send Discord notification: {response.status_code} {response.text}")
-            
-    except Exception as e:
-        logger.error(f"Error sending Discord notification: {str(e)}")
-        logger.error(traceback.format_exc())
+            return {
+                'success': False,
+                'error': 'Maximum attempts reached without success',
+                'cart_url': '',
+                'checkout_url': ''
+            }
 
 if __name__ == "__main__":
     # Parse command line arguments
@@ -1648,587 +1562,1032 @@ if __name__ == "__main__":
     
     try:
         # Run the monitoring
-        asyncio.run(monitor_tickets(
+        result = asyncio.run(monitor_tickets(
             manual_mode=manual_mode, 
             test_mode=test_mode,
             persistent_browser=persistent_browser
         ))
+        if result:
+            print(result)
     except KeyboardInterrupt:
         print("\nScript interrupted by user. Exiting.")
     except Exception as e:
         print(f"\nAn error occurred: {str(e)}")
         logger.error(f"Fatal error: {str(e)}", exc_info=True)
 
-async def take_screenshot(page, filename):
-    """
-    Take a screenshot and save it to the specified filename
-    
-    Args:
-        page: Playwright page object
-        filename: Name of the file to save the screenshot to
-    """
-    try:
-        screenshot_dir = "screenshots"
-        if not os.path.exists(screenshot_dir):
-            os.makedirs(screenshot_dir)
-        
-        full_path = os.path.join(screenshot_dir, filename)
-        await page.screenshot(path=full_path)
-        logger.info(f"Screenshot saved to {full_path}")
-        return full_path
-    except Exception as e:
-        logger.error(f"Error taking screenshot: {str(e)}")
-        return None
-
-
-async def is_element_visible(page, selector, timeout=2000):
-    """
-    Check if an element is visible on the page
-    
-    Args:
-        page: Playwright page object
-        selector: CSS selector to check
-        timeout: Timeout in milliseconds
-        
-    Returns:
-        True if element is visible, False otherwise
-    """
-    try:
-        element = await page.wait_for_selector(selector, timeout=timeout, state="visible")
-        return element is not None
-    except Exception:
-        return False
-
-
-async def click_element_if_visible(page, selector, timeout=2000):
-    """
-    Click an element if it is visible on the page
-    
-    Args:
-        page: Playwright page object
-        selector: CSS selector to click
-        timeout: Timeout in milliseconds
-        
-    Returns:
-        True if element was clicked, False otherwise
-    """
-    try:
-        element = await page.wait_for_selector(selector, timeout=timeout, state="visible")
-        if element:
-            await element.click()
-            return True
-        return False
-    except Exception:
-        return False
-
-
-async def select_best_available(page, quantity=2):
-    """
-    Select the "Best Available" option on the ticket page
-    
-    Args:
-        page: Playwright page object
-        quantity: Number of tickets to select
-        
-    Returns:
-        True if successful, False otherwise
-    """
-    try:
-        # Try different selectors for "Best Available" buttons
-        best_available_selectors = [
-            "button:has-text('Best Available')",
-            "button:has-text('Mejor Disponible')",
-            "[data-testid='best-available-button']",
-            ".best-available-button",
-            "a:has-text('Best Available')"
-        ]
-        
-        for selector in best_available_selectors:
-            if await click_element_if_visible(page, selector):
-                logger.info(f"Clicked Best Available button: {selector}")
-                await page.wait_for_load_state('networkidle')
-                await asyncio.sleep(1)  # Wait for any animations
-                
-                # Set quantity if needed
-                await set_quantity(page, quantity)
-                
-                # Look for any confirm buttons
-                confirm_selectors = [
-                    "button:has-text('Confirm')",
-                    "button:has-text('Confirmar')",
-                    "button:has-text('Continue')",
-                    "button:has-text('Continuar')",
-                    "button.btn-primary",
-                    "button.confirm-button"
-                ]
-                
-                for confirm_selector in confirm_selectors:
-                    if await click_element_if_visible(page, confirm_selector):
-                        logger.info(f"Clicked confirm button: {confirm_selector}")
-                        await page.wait_for_load_state('networkidle')
-                        break
-                
-                # If we got here but didn't find a confirm button,
-                # we still consider it a success since we clicked Best Available
-                return True
-                
-        logger.warning("Best Available option not found")
-        return False
-        
-    except Exception as e:
-        logger.error(f"Error selecting Best Available: {str(e)}")
-        return False
-
-
-async def set_quantity(page, quantity=2):
-    """
-    Set the quantity of tickets to purchase
-    
-    Args:
-        page: Playwright page object
-        quantity: Number of tickets to select
-        
-    Returns:
-        True if successful, False otherwise
-    """
-    try:
-        # Wait a moment for any quantity inputs to be visible
-        await asyncio.sleep(0.5)
-        
-        # Look for quantity input fields
-        quantity_selectors = [
-            "input[type='number']",
-            ".quantity-input",
-            "[data-testid='quantity-input']",
-            "select.quantity-select"
-        ]
-        
-        for selector in quantity_selectors:
-            quantity_element = await page.query_selector(selector)
-            if quantity_element:
-                logger.info(f"Found quantity input with selector: {selector}")
-                
-                # Check if it's a select element
-                tag_name = await quantity_element.evaluate("el => el.tagName.toLowerCase()")
-                
-                if tag_name == "select":
-                    # For select elements, try to select the option with the desired quantity
-                    options = await quantity_element.query_selector_all("option")
-                    option_found = False
-                    
-                    for option in options:
-                        value = await option.get_attribute("value")
-                        if value and value.isdigit() and int(value) == quantity:
-                            await quantity_element.select_option(value=value)
-                            logger.info(f"Selected quantity {quantity} from dropdown")
-                            option_found = True
-                            break
-                    
-                    if not option_found:
-                        # If we couldn't find the exact quantity, pick the closest one
-                        closest_value = None
-                        closest_diff = float('inf')
-                        
-                        for option in options:
-                            value = await option.get_attribute("value")
-                            if value and value.isdigit():
-                                diff = abs(int(value) - quantity)
-                                if diff < closest_diff:
-                                    closest_diff = diff
-                                    closest_value = value
-                        
-                        if closest_value:
-                            await quantity_element.select_option(value=closest_value)
-                            logger.info(f"Selected closest quantity {closest_value} from dropdown")
-                            return True
-                else:
-                    # For input elements
-                    await quantity_element.fill(str(quantity))
-                    logger.info(f"Set quantity to {quantity}")
-                    
-                    # Look for any "Apply" or "Update" buttons
-                    update_selectors = [
-                        "button:has-text('Apply')",
-                        "button:has-text('Update')",
-                        "button:has-text('Aplicar')",
-                        "button:has-text('Actualizar')",
-                        "button.apply-button",
-                        "button.update-button"
-                    ]
-                    
-                    for update_selector in update_selectors:
-                        if await click_element_if_visible(page, update_selector):
-                            logger.info(f"Clicked update button: {update_selector}")
-                            await page.wait_for_load_state('networkidle')
-                            break
-                
-                return True
-        
-        logger.info("No quantity input found, using default quantity")
-        return False
-        
-    except Exception as e:
-        logger.error(f"Error setting quantity: {str(e)}")
-        return False
-
-
-async def handle_popup(page):
-    """
-    Handle any popups that appear during the checkout process
-    
-    Args:
-        page: Playwright page object
-        
-    Returns:
-        True if a popup was handled, False otherwise
-    """
-    try:
-        # Look for common popup elements and their confirm/continue buttons
-        popup_button_selectors = [
-            "button:has-text('Confirm')",
-            "button:has-text('Confirmar')",
-            "button:has-text('Continue')",
-            "button:has-text('Continuar')",
-            "button:has-text('Accept')",
-            "button:has-text('Aceptar')",
-            "button:has-text('OK')",
-            "button.popup-confirm",
-            "button.continue-button",
-            ".popup button.btn-primary",
-            ".modal button.btn-primary"
-        ]
-        
-        for selector in popup_button_selectors:
-            if await click_element_if_visible(page, selector):
-                logger.info(f"Clicked popup button: {selector}")
-                await page.wait_for_load_state('networkidle')
-                await asyncio.sleep(0.5)  # Wait for any transitions
-                
-                # Check if we need to set quantity
-                quantity_input = await page.query_selector("input[type='number'], .quantity-input")
-                if quantity_input:
-                    logger.info("Setting quantity to 2")
-                    await quantity_input.fill("2")
-                    
-                    # Look for an apply or update button
-                    update_button = await page.query_selector("button:has-text('Apply'), button:has-text('Update'), button:has-text('Aplicar'), button:has-text('Actualizar')")
-                    if update_button:
-                        await update_button.click()
-                        await page.wait_for_load_state('networkidle')
-                
-                return True
-                
-        return False
-        
-    except Exception as e:
-        logger.error(f"Error handling popup: {str(e)}")
-        return False
-
-
 async def add_to_cart(page):
     """
-    Click the add to cart or proceed to checkout button
+    Add selected tickets to cart
     
     Args:
         page: Playwright page object
         
     Returns:
-        True if successful, False otherwise
+        dict: Dictionary with cart result information
     """
+    # Initialize the result dictionary
+    cart_result = {
+        'success': False,
+        'cart_url': '',
+        'checkout_url': '',
+        'error': ''
+    }
+    
     try:
-        # Look for add to cart or checkout buttons
+        logger.info("Attempting to add tickets to cart...")
+        
+        # Wait for the page to stabilize
+        await page.wait_for_load_state("networkidle")
+        await asyncio.sleep(random.uniform(0.7, 1.5))
+        
+        # Look for add to cart or checkout buttons with various selectors
         cart_button_selectors = [
-            "button#add-to-cart-button",            # Common ID for add to cart
-            "button.add-to-cart-button",            # Common class for add to cart 
+            "button#add-to-cart-button",
+            "button.add-to-cart-button",
             "button:has-text('Add to Cart')",
             "button:has-text('Añadir al Carrito')",
-            "button:has-text('Add to cart')",
-            "button:has-text('Añadir')",
-            "button.add-to-cart",
-            "[data-testid='add-to-cart']",
-            "button.addtocart",
-            "button:has-text('BOLETOS')",
-            "button:has-text('Tickets')",
             "button:has-text('Continue')",
             "button:has-text('Continuar')",
-            "a:has-text('Add to Cart')",
-            "a:has-text('Añadir al Carrito')"
+            "button:has-text('Next')",
+            "button:has-text('Siguiente')",
+            "button:has-text('Checkout')",
+            "button:has-text('Pagar')",
+            "button.btn-primary",
+            "button.continue-button",
+            "a.btn-primary:has-text('Checkout')",
+            "a.btn-primary:has-text('Add to Cart')",
+            "a.checkout-button",
+            "input[type='submit'][value='Add to Cart']",
+            "input[type='submit'][value='Checkout']"
         ]
         
+        # Try to find and click on a cart button
+        button_found = False
+        
         for selector in cart_button_selectors:
-            try:
-                logger.info(f"Looking for add to cart button with selector: {selector}")
-                cart_button = await page.query_selector(selector)
-                if cart_button:
-                    # Check if the button is visible and enabled
-                    is_visible = await cart_button.is_visible()
-                    is_enabled = await cart_button.evaluate("el => !el.disabled")
-                    
-                    if is_visible and is_enabled:
-                        await cart_button.scroll_into_view_if_needed()
-                        logger.info(f"Found enabled add to cart button with selector: {selector}")
-                        
-                        # Take screenshot before clicking
-                        await take_screenshot(page, "before_add_to_cart.png")
-                        
-                        # Click the button
-                        await cart_button.click(force=True)  # Use force=True to ensure click happens
-                        logger.info(f"Clicked add to cart button with selector: {selector}")
-                        await take_screenshot(page, "add_cart_clicked.png")
-                        
-                        # Wait longer for potential navigation or cart update
-                        await asyncio.sleep(5)
-                        
-                        # After clicking add to cart, check if we're on a cart page
-                        cart_verification = await verify_cart_page(page)
-                        if cart_verification:
-                            cart_url = page.url
-                            logger.info(f"Successfully navigated to cart page at: {cart_url}")
-                            
-                            # Check for ticket count in cart
-                            try:
-                                cart_items = await page.query_selector_all("div.cart-item, div.line-item, [class*='cart-item'], [class*='ticket'], div:has-text('Ticket'), div:has-text('Boleto')")
-                                logger.info(f"Found {len(cart_items)} items in cart")
-                                
-                                if len(cart_items) > 0:
-                                    logger.info("TICKETS SUCCESSFULLY ADDED TO CART!")
-                                    try:
-                                        await send_discord_notification({
-                                            'success': True,
-                                            'message': f"Successfully added {len(cart_items)} tickets to cart!",
-                                            'url': cart_url,
-                                            'timestamp': datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-                                        })
-                                    except Exception as notification_error:
-                                        logger.error(f"Error sending Discord notification: {str(notification_error)}")
-                                else:
-                                    logger.warning("Cart page found but no items detected in cart")
-                            except Exception as e:
-                                logger.warning(f"Error counting cart items: {str(e)}")
-                            
-                            # Now look for checkout button
-                            checkout_selectors = [
-                                "button:has-text('Checkout')",
-                                "button:has-text('Pagar')",
-                                "button:has-text('Proceed to Checkout')",
-                                "button:has-text('Proceder al Pago')",
-                                "button.checkout-button",
-                                "a.checkout-button",
-                                "button[class*='checkout']",
-                                "a[class*='checkout']",
-                                "button.btn-primary",
-                                "a.btn-primary"
-                            ]
-                            
-                            for checkout_selector in checkout_selectors:
-                                try:
-                                    checkout_button = await page.query_selector(checkout_selector)
-                                    if checkout_button:
-                                        await checkout_button.scroll_into_view_if_needed()
-                                        await checkout_button.click()
-                                        logger.info(f"Clicked checkout button with selector: {checkout_selector}")
-                                        await asyncio.sleep(5)
-                                        checkout_url = page.url
-                                        logger.info(f"Successfully navigated to checkout page at: {checkout_url}")
-                                        await take_screenshot(page, "checkout_page.png")
-                                        return True
-                                except Exception as e:
-                                    logger.debug(f"Failed to click checkout button with selector {checkout_selector}: {str(e)}")
-                            
-                            # If we couldn't click a checkout button but are on cart page, still consider success
-                            return True
-                    else:
-                        logger.debug(f"Found add to cart button with selector {selector} but it's not visible or enabled")
-                else:
-                    logger.debug(f"No add to cart button found with selector: {selector}")
-            except Exception as e:
-                logger.debug(f"Failed to click add to cart with selector {selector}: {str(e)}")
-        
-        # If we haven't successfully found the cart page yet, check again
-        cart_verification = await verify_cart_page(page)
-        if cart_verification:
-            cart_url = page.url
-            logger.info(f"Successfully on cart page: {page.url}")
-            return True
-        
-        # Last resort: Try to look for text indicating we're on a relevant page
-        try:
-            page_text = await page.evaluate("() => document.body.innerText")
-            if "cart" in page_text.lower() or "carrito" in page_text.lower():
-                logger.info("Page text contains 'cart' or 'carrito', might be on cart page")
-                return True
-        except Exception as e:
-            logger.debug(f"Error checking page text: {str(e)}")
+            cart_button = await page.query_selector(selector)
             
-        logger.warning("Could not add tickets to cart")
-        return False
+            if cart_button:
+                logger.info(f"Found cart button with selector: {selector}")
+                
+                # Human-like behavior: Pause before clicking
+                await asyncio.sleep(random.uniform(0.5, 1.2))
+                
+                # Get button position for human-like mouse movement
+                button_box = await cart_button.bounding_box()
+                if button_box:
+                    # First move mouse to a random position
+                    await page.mouse.move(
+                        random.randint(50, int(page.viewport_size['width'] - 50)),
+                        random.randint(50, int(page.viewport_size['height'] - 50))
+                    )
+                    await asyncio.sleep(random.uniform(0.1, 0.3))
+                    
+                    # Then move to the button with slight randomization
+                    await page.mouse.move(
+                        button_box['x'] + button_box['width'] / 2 + random.randint(-5, 5),
+                        button_box['y'] + button_box['height'] / 2 + random.randint(-3, 3)
+                    )
+                    await asyncio.sleep(random.uniform(0.2, 0.4))
+                
+                # Click the button
+                await cart_button.click()
+                logger.info(f"Clicked cart button")
+                button_found = True
+                
+                # Wait for navigation or page updates
+                await page.wait_for_load_state("networkidle")
+                await asyncio.sleep(random.uniform(1.0, 2.0))
+                
+                # Take a screenshot after clicking
+                await take_screenshot(page, "after_add_to_cart.png")
+                
+                # Check if we're now on a cart or checkout page
+                current_url = page.url
+                if "cart" in current_url.lower() or "checkout" in current_url.lower():
+                    logger.info(f"Successfully added to cart. Current URL: {current_url}")
+                    cart_result['success'] = True
+                    cart_result['cart_url'] = current_url
+                    
+                    # Look for any checkout button that might be present
+                    checkout_button_selectors = [
+                        "button:has-text('Checkout')",
+                        "button:has-text('Proceed to Checkout')",
+                        "button:has-text('Continuar al pago')",
+                        "a:has-text('Checkout')",
+                        "a:has-text('Proceed to Checkout')",
+                        "a.checkout-button",
+                        "button.checkout-button"
+                    ]
+                    
+                    for checkout_selector in checkout_button_selectors:
+                        if await is_element_visible(page, checkout_selector):
+                            logger.info(f"Found checkout button: {checkout_selector}")
+                            break
+                    
+                    return cart_result
+                
+                # Handle possible popups or dialogues that might appear after clicking
+                await handle_popup(page)
+                
+                # Check for cart messages or success indicators
+                success_indicators = [
+                    ".cart-success-message",
+                    ".success-message",
+                    ".cart-confirmation",
+                    "div:has-text('Added to cart')",
+                    "div:has-text('Añadido al carrito')"
+                ]
+                
+                for indicator in success_indicators:
+                    if await is_element_visible(page, indicator):
+                        logger.info(f"Found success indicator: {indicator}")
+                        cart_result['success'] = True
+                        cart_result['cart_url'] = page.url
+                        return cart_result
+                
+                # Check if we have items in the cart
+                cart_item_selectors = [
+                    ".cart-item",
+                    ".item-in-cart",
+                    ".checkout-item",
+                    "tr.cart-row",
+                    "div.cart-product"
+                ]
+                
+                for item_selector in cart_item_selectors:
+                    cart_items = await page.query_selector_all(item_selector)
+                    if cart_items and len(cart_items) > 0:
+                        logger.info(f"Found {len(cart_items)} items in cart with selector: {item_selector}")
+                        cart_result['success'] = True
+                        cart_result['cart_url'] = page.url
+                        return cart_result
+                
+                # Even if we don't find explicit success indicators, consider it a success if we clicked a button
+                cart_result['success'] = True
+                cart_result['cart_url'] = page.url
+                logger.info("Assuming cart addition was successful based on button click")
+                return cart_result
+        
+        if not button_found:
+            logger.warning("No add to cart or checkout button found")
+            await take_screenshot(page, "no_cart_button.png")
+            cart_result['error'] = "No add to cart button found"
+            return cart_result
+        
+        # If we reached here, consider it a failure
+        cart_result['error'] = "Could not verify successful cart addition"
+        return cart_result
         
     except Exception as e:
         logger.error(f"Error adding to cart: {str(e)}")
+        await take_screenshot(page, "add_to_cart_error.png")
+        cart_result['error'] = f"Error adding to cart: {str(e)}"
+        return cart_result
+
+async def select_best_available(page, quantity=2):
+    """
+    Try to select 'Best Available' seats if that option exists
+    
+    Args:
+        page: Playwright page object
+        quantity: Number of tickets to select
+        
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    try:
+        logger.info(f"Attempting to select best available seats (quantity: {quantity})...")
+        
+        # Look for a quantity selector first and set it
+        await set_quantity(page, quantity)
+        
+        # Look for "Best Available" option with various selectors
+        best_available_selectors = [
+            "button:has-text('Best Available')",
+            "button:has-text('Mejor Disponible')",
+            "button:has-text('Best Seats')",
+            "button:has-text('Mejores Asientos')",
+            "button.best-available-button",
+            "button[data-action='best-available']",
+            "button[data-selection-method='best-available']",
+            "a:has-text('Best Available')",
+            "a:has-text('Mejor Disponible')",
+            ".best-available-option",
+            "input[type='radio'][value='best-available']",
+            "input[id*='best-available']"
+        ]
+        
+        # Try each selector
+        for selector in best_available_selectors:
+            if await is_element_visible(page, selector):
+                logger.info(f"Found 'Best Available' option with selector: {selector}")
+                
+                # Human-like behavior - slight delay before clicking
+                await asyncio.sleep(random.uniform(0.3, 0.8))
+                
+                # Click the best available option
+                best_option = await page.query_selector(selector)
+                if best_option:
+                    # Get the button position for human-like mouse movement
+                    button_box = await best_option.bounding_box()
+                    if button_box:
+                        # Move mouse progressively towards the button
+                        await page.mouse.move(
+                            random.randint(50, int(page.viewport_size['width'] - 50)),
+                            random.randint(50, int(page.viewport_size['height'] - 50))
+                        )
+                        await asyncio.sleep(random.uniform(0.1, 0.3))
+                        
+                        # Move to the button with slight randomization
+                        await page.mouse.move(
+                            button_box['x'] + button_box['width'] / 2 + random.randint(-5, 5),
+                            button_box['y'] + button_box['height'] / 2 + random.randint(-3, 3)
+                        )
+                        await asyncio.sleep(random.uniform(0.2, 0.4))
+                    
+                    # Click the button
+                    await best_option.click()
+                    logger.info("Clicked on 'Best Available' option")
+                    
+                    # Wait for the page to update
+                    await page.wait_for_load_state("networkidle")
+                    await asyncio.sleep(random.uniform(0.5, 1.5))
+                    
+                    # Look for a confirmation button that might appear
+                    confirm_selectors = [
+                        "button:has-text('Continue')",
+                        "button:has-text('Continuar')",
+                        "button:has-text('Confirm')",
+                        "button:has-text('Confirmar')",
+                        "button:has-text('Apply')",
+                        "button:has-text('Aplicar')",
+                        "button.btn-primary",
+                        "button.confirm-button"
+                    ]
+                    
+                    for confirm_selector in confirm_selectors:
+                        confirm_button = await page.query_selector(confirm_selector)
+                        if confirm_button:
+                            logger.info(f"Found confirmation button with selector: {confirm_selector}")
+                            await asyncio.sleep(random.uniform(0.3, 0.8))
+                            
+                            # Click the confirmation button
+                            await confirm_button.click()
+                            logger.info("Clicked confirmation button")
+                            await asyncio.sleep(random.uniform(0.5, 1.0))
+                            await page.wait_for_load_state("networkidle")
+                    
+                    # Check if seats were actually selected
+                    return await check_if_seats_selected(page)
+        
+        # If we reach here, we didn't find a "Best Available" option
+        logger.info("No 'Best Available' option found")
+        return False
+        
+    except Exception as e:
+        logger.error(f"Error selecting best available seats: {str(e)}")
+        await take_screenshot(page, "best_available_error.png")
         return False
 
-
-async def verify_cart_page(page):
+async def check_if_seats_selected(page):
     """
-    Verify if the current page is a cart page
+    Check if seats were successfully selected
     
     Args:
         page: Playwright page object
         
     Returns:
-        True if the page is a cart page, False otherwise
+        bool: True if seats appear to be selected, False otherwise
     """
     try:
-        # Check URL for cart/checkout indicators
-        current_url = page.url
-        if any(keyword in current_url.lower() for keyword in ['cart', 'carrito', 'checkout', 'pagar', 'payment']):
-            logger.info(f"URL suggests we're on a cart/checkout page: {current_url}")
-            return True
-            
-        # Check for cart/checkout page elements
-        cart_page_selectors = [
-            "h1:has-text('Shopping Cart'), h1:has-text('Carrito')",
-            "h1:has-text('Checkout'), h1:has-text('Pagar')",
-            "div.cart, div.cart-container",
-            "div.checkout, div.checkout-container",
-            ".cart-items, .checkout-items",
-            "[data-testid='cart'], [data-testid='checkout']",
-            ".cart-summary, .checkout-summary",
-            "div:has-text('Shopping Cart'):not(:has-text('Shopping Cart.'))",
-            "div:has-text('Carrito'):not(:has-text('Carrito.'))",
-            "div:has-text('Order Summary'):not(:has-text('Order Summary.'))",
-            "div:has-text('Resumen de Orden'):not(:has-text('Resumen de Orden.'))"
+        # Different indicators that seats might be selected
+        selected_indicators = [
+            "circle[fill='#FF0000'], circle[fill='red']",  # Red circles (often selected)
+            "rect[fill='#FF0000'], rect[fill='red']",      # Red rectangles
+            "path[fill='#FF0000'], path[fill='red']",      # Red paths
+            ".seat.selected",                              # Selected class
+            "[class*='selected']",                         # Contains selected in class
+            "[data-status='selected']",                    # Data attribute
+            "text:has-text('Selected')",                   # Text indicating selection
+            "text:has-text('Seleccionado')",               # Spanish version
+            "div:has-text('Selected seats:')",             # Heading for selected seats
+            "div:has-text('Asientos seleccionados:')"      # Spanish version
         ]
         
-        for selector in cart_page_selectors:
-            element = await page.query_selector(selector)
-            if element:
-                logger.info(f"Found cart/checkout page element with selector: {selector}")
+        for indicator in selected_indicators:
+            elements = await page.query_selector_all(indicator)
+            if elements and len(elements) > 0:
+                logger.info(f"Found {len(elements)} elements indicating seats are selected")
                 return True
-                
-        # Check page title
-        title = await page.title()
-        if any(keyword in title.lower() for keyword in ['cart', 'carrito', 'checkout', 'pagar', 'payment']):
-            logger.info(f"Page title suggests we're on a cart/checkout page: {title}")
-            return True
-            
-        # Check for order summary or cart total elements
-        total_selectors = [
-            ".order-total, .cart-total",
-            ".summary-total, .checkout-total",
-            "div:has-text('Total'):not(:has-text('Total.'))",
-            ".price-total, .amount-total"
+        
+        # If we can see an "Add to Cart" button, that's also a good sign
+        cart_buttons = [
+            "button:has-text('Add to Cart')",
+            "button:has-text('Añadir al carrito')",
+            "button#add-to-cart-button",
+            "button.add-to-cart-button"
         ]
         
-        for selector in total_selectors:
-            element = await page.query_selector(selector)
-            if element:
-                logger.info(f"Found total/summary element with selector: {selector}")
+        for button in cart_buttons:
+            if await is_element_visible(page, button):
+                logger.info(f"Found cart button '{button}' which suggests seats are selected")
                 return True
-                
-        logger.warning("Could not verify if the current page is a cart page")
+        
+        logger.info("No indicators found that seats are selected")
         return False
         
     except Exception as e:
-        logger.error(f"Error verifying cart page: {str(e)}")
+        logger.error(f"Error checking if seats are selected: {str(e)}")
         return False
 
-async def proceed_to_checkout(page):
+async def handle_cloudflare_challenge(page, max_wait_time=60, manual_solve=True):
     """
-    Click the proceed to checkout button
+    Detect and handle Cloudflare challenge pages
     
     Args:
-        page: Playwright page object
+        page: Playwright page instance
+        max_wait_time: Maximum time to wait for the challenge to be solved (seconds)
+        manual_solve: Whether to allow manual solving of the challenge
         
     Returns:
-        True if successful, False otherwise
+        bool: True if challenge was bypassed, False otherwise
     """
     try:
-        # Look for proceed to checkout buttons
-        checkout_button_selectors = [
-            "button:has-text('Proceed to Checkout')",
-            "button:has-text('Checkout')",
-            "button:has-text('Finalizar Compra')",
-            "button:has-text('Complete Purchase')",
-            "button:has-text('Completar Compra')",
-            "button:has-text('Continuar')",
-            "a:has-text('Checkout')",
-            "a:has-text('Finalizar Compra')",
-            "button.checkout-button",
-            "[data-testid='checkout-button']",
-            "button.btn-primary:has-text('Continue')",
-            "button.btn-success"
+        # Check if we're on a Cloudflare challenge page
+        cloudflare_selectors = [
+            "#challenge-running",
+            "#challenge-form",
+            "#cf-challenge-running",
+            "div[class*='cf-browser-verification']",
+            "iframe[src*='cloudflare']",
+            "div[class*='challenge']",
+            "script[data-cf-settings]",
+            "div:has-text('Checking your browser before accessing')"
         ]
         
-        for selector in checkout_button_selectors:
-            if await click_element_if_visible(page, selector):
-                logger.info(f"Clicked proceed to checkout button: {selector}")
-                await page.wait_for_load_state('networkidle')
-                await asyncio.sleep(1)  # Wait for any transitions
+        for selector in cloudflare_selectors:
+            if await is_element_visible(page, selector):
+                logger.warning("⚠️ Cloudflare challenge detected!")
                 
-                # Handle any popups that might appear
-                await handle_popup(page)
+                # Take a screenshot of the challenge
+                await take_screenshot(page, "cloudflare_challenge.png")
                 
-                # Take a screenshot to help with debugging
-                await take_screenshot(page, "after_proceed_to_checkout.png")
-                
-                return True
-                
-        logger.warning("Proceed to checkout button not found")
-        await take_screenshot(page, "proceed_to_checkout_button_not_found.png")
-        return False
+                if manual_solve:
+                    # Notify the user that manual intervention is needed
+                    logger.info("Manual intervention needed to solve Cloudflare challenge")
+                    logger.info("Please complete the Cloudflare verification in the browser window")
+                    logger.info(f"Waiting up to {max_wait_time} seconds for verification to complete...")
+                    
+                    # Wait for the challenge to disappear or timeout
+                    start_time = time.time()
+                    while time.time() - start_time < max_wait_time:
+                        challenge_visible = False
+                        for selector in cloudflare_selectors:
+                            if await is_element_visible(page, selector):
+                                challenge_visible = True
+                                break
+                        
+                        if not challenge_visible:
+                            logger.info("✅ Cloudflare challenge appears to be solved!")
+                            
+                            # Store cookies for future use
+                            cookies = await page.context.cookies()
+                            cf_cookie = next((c for c in cookies if c.get('name') == 'cf_clearance'), None)
+                            if cf_cookie:
+                                logger.info("📝 Cloudflare clearance cookie obtained")
+                            
+                            # Wait for the page to fully load
+                            await page.wait_for_load_state("networkidle")
+                            return True
+                        
+                        # Check every second
+                        await asyncio.sleep(1)
+                    
+                    logger.error("❌ Timeout waiting for Cloudflare challenge to be solved")
+                    return False
+                else:
+                    # Attempt automated bypass
+                    logger.info("Attempting automated Cloudflare bypass...")
+                    
+                    # Perform human-like actions
+                    # 1. Random mouse movements
+                    for _ in range(5):
+                        x = random.randint(100, int(page.viewport_size['width'] - 100))
+                        y = random.randint(100, int(page.viewport_size['height'] - 100))
+                        await page.mouse.move(x, y)
+                        await asyncio.sleep(random.uniform(0.1, 0.3))
+                    
+                    # 2. Small scrolls
+                    await page.mouse.wheel(0, random.randint(50, 200))
+                    await asyncio.sleep(random.uniform(0.5, 1.0))
+                    
+                    # 3. Wait for automatic verification to complete
+                    await page.wait_for_timeout(random.uniform(5000, 10000))
+                    
+                    # Check if we're still on the challenge page
+                    for selector in cloudflare_selectors:
+                        if await is_element_visible(page, selector):
+                            logger.error("❌ Automated Cloudflare bypass failed")
+                            return False
+                    
+                    logger.info("✅ Cloudflare challenge appears to be solved!")
+                    return True
+        
+        # No Cloudflare challenge detected
+        return True
         
     except Exception as e:
-        logger.error(f"Error proceeding to checkout: {str(e)}")
+        logger.error(f"Error handling Cloudflare challenge: {str(e)}")
         return False
 
-
-async def send_discord_notification(data):
+async def automatic_cart(url, options=None, persistent_browser=False):
     """
-    Send a notification to Discord webhook
+    Automate the process of selecting seats and adding them to cart
     
     Args:
-        data: Dictionary with notification data
+        url: URL of the event page
+        options: Dictionary containing options like quantity, auto_checkout, best_available
+        persistent_browser: Whether to reuse a browser instance
+    
+    Returns:
+        Dictionary with cart details or error information
     """
+    options = options or {}
+    quantity = options.get("quantity", 2)
+    auto_checkout = options.get("auto_checkout", False)
+    best_available = options.get("best_available", True)
+    
+    # Initialize result dictionary
+    cart_result = {
+        "success": False,
+        "error": "",
+        "cart_url": "",
+        "checkout_url": "",
+        "section": "",
+        "row": "",
+        "seats": [],
+        "price": "",
+        "quantity": quantity,
+        "event_date": options.get("event_date", "Unknown")
+    }
+    
+    playwright = None
+    browser = None
+    page = None
+    
     try:
-        webhook_url = os.environ.get('DISCORD_WEBHOOK_URL')
-        if not webhook_url:
-            logger.warning("No Discord webhook URL found in environment variables")
-            return
-            
-        # Create a Discord embed object
-        embed = {
-            "title": "🎟️ Ticket Monitor Alert",
-            "description": data.get('message', 'Ticket status update'),
-            "color": 5814783,  # Green color
-            "fields": [],
-            "footer": {
-                "text": f"TOVK Band Ticket Monitor • {data.get('timestamp', datetime.now().strftime('%Y-%m-%d %H:%M:%S'))}"
-            }
+        logger.info(f"Starting automatic cart process for event: {url}")
+        logger.info(f"Options: quantity={quantity}, auto_checkout={auto_checkout}, best_available={best_available}")
+        
+        # Initialize Playwright
+        playwright = await async_playwright().start()
+        
+        # Define enhanced browser launch options for better stealth
+        browser_launch_options = {
+            "headless": False,  # Use headed mode to appear more human-like
+            "channel": "chrome",  # Use Chrome channel which is less likely to be detected
+            "args": [
+                "--no-sandbox",
+                "--disable-setuid-sandbox",
+                "--disable-infobars",
+                "--window-size=1920,1080",
+                "--start-maximized",
+                "--disable-extensions",
+                "--disable-blink-features=IsolateOrigins,site-per-process",
+                "--ignore-certificate-errors",
+                "--disable-web-security",
+                "--allow-running-insecure-content",
+                "--disable-features=IsolateOrigins",
+                "--disable-site-isolation-trials"
+            ],
+            "ignore_default_args": ["--enable-automation"]
         }
         
-        # Add URL as a field if available
-        if 'url' in data:
-            embed["fields"].append({
-                "name": "🔗 URL",
-                "value": data['url'],
-                "inline": False
-            })
+        # Launch browser with enhanced options
+        browser = await playwright.chromium.launch(**browser_launch_options)
+        
+        # Set up browser context with human-like properties
+        user_agent = random.choice([
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:124.0) Gecko/20100101 Firefox/124.0",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36 Edg/123.0.0.0"
+        ])
+        
+        context = await browser.new_context(
+            user_agent=user_agent,
+            locale="en-US",
+            timezone_id="America/New_York",
+            geolocation={"latitude": 40.7128, "longitude": -74.0060},
+            permissions=["geolocation"],
+            color_scheme="light"
+        )
+        
+        # Set extra HTTP headers to appear more human-like
+        await context.set_extra_http_headers({
+            "Accept-Language": "en-US,en;q=0.9,es;q=0.8",
+            "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
+            "sec-ch-ua": '"Google Chrome";v="123", "Not:A-Brand";v="8", "Chromium";v="123"',
+            "sec-ch-ua-mobile": "?0",
+            "sec-ch-ua-platform": "\"Windows\"",
+            "sec-fetch-dest": "document",
+            "sec-fetch-mode": "navigate",
+            "sec-fetch-site": "none",
+            "sec-fetch-user": "?1",
+            "upgrade-insecure-requests": "1"
+        })
+        
+        # Configure browser for avoiding detection
+        await configure_browser_for_cloudflare(browser)
+        
+        # Create a new page
+        page = await context.new_page()
+        
+        # Add human-like behavior before navigating
+        await page.mouse.move(
+            random.randint(200, 800),
+            random.randint(100, 600)
+        )
+        
+        logger.info("Step 1: Opening event page...")
+        # Navigate to the event URL with a timeout
+        try:
+            response = await page.goto(url, timeout=30000, wait_until="domcontentloaded")
+            if not response:
+                cart_result["error"] = "Failed to navigate to event page"
+                return cart_result
+                
+            # Take screenshot of initial page load
+            await take_screenshot(page, "01_event_page.png")
             
-        # Create the Discord message
-        message = {
-            "content": "@everyone **ALERT!** Ticket status change detected!",
-            "embeds": [embed]
+            # Check for Cloudflare challenge
+            cloudflare_result = await handle_cloudflare_challenge(page, max_wait_time=90, manual_solve=True)
+            if not cloudflare_result:
+                cart_result["error"] = "Could not bypass Cloudflare protection"
+                return cart_result
+                
+            # Wait for the page to fully load after potential Cloudflare challenge
+            await page.wait_for_load_state("networkidle")
+            
+            # Add random delays and mouse movements to appear more human-like
+            await asyncio.sleep(random.uniform(1.0, 2.5))
+            
+            # Perform random mouse movements and scrolls
+            for _ in range(3):
+                x = random.randint(100, int(page.viewport_size['width'] - 100))
+                y = random.randint(100, int(page.viewport_size['height'] - 100))
+                await page.mouse.move(x, y, steps=random.randint(5, 10))
+                await asyncio.sleep(random.uniform(0.2, 0.5))
+            
+            # Random small scroll
+            await page.mouse.wheel(0, random.randint(100, 300))
+            await asyncio.sleep(random.uniform(0.5, 1.0))
+            
+            # Step 2: Try to select best available seats first if option is enabled
+            if best_available:
+                logger.info("Attempting to select best available seats...")
+                best_seats_selected = await select_best_available(page, quantity)
+                
+                if best_seats_selected:
+                    logger.info("Best available seats selected successfully")
+                else:
+                    logger.info("Best available selection failed or not available, trying seat map...")
+                    # Try to select from seat map as fallback
+                    seat_result = await select_seat_from_map(page)
+                    if not seat_result:
+                        cart_result["error"] = "Failed to select seats from map"
+                        return cart_result
+            else:
+                # Select seats from the seat map
+                logger.info("Selecting seats from map...")
+                seat_result = await select_seat_from_map(page)
+                if not seat_result:
+                    cart_result["error"] = "Failed to select seats from map"
+                    return cart_result
+            
+            # Step 3: Set quantity if not already done
+            await asyncio.sleep(random.uniform(0.5, 1.0))
+            await set_quantity(page, quantity)
+            
+            # Step 4: Add to cart
+            logger.info("Step 4: Adding tickets to cart...")
+            add_to_cart_result = await add_to_cart(page)
+            
+            # Update result with cart information
+            cart_result.update(add_to_cart_result)
+            
+            if add_to_cart_result.get("success", False):
+                logger.info("✅ Successfully added tickets to cart!")
+                
+                # Capture final page state
+                await take_screenshot(page, "05_tickets_in_cart.png")
+                
+                # Perform automatic checkout if enabled
+                if auto_checkout:
+                    logger.info("Starting automatic checkout process...")
+                    checkout_result = await proceed_to_checkout(page)
+                    cart_result.update(checkout_result)
+            else:
+                logger.error(f"❌ Failed to add tickets to cart: {add_to_cart_result.get('error', 'Unknown error')}")
+            
+            return cart_result
+            
+        except Exception as e:
+            logger.error(f"Error navigating to URL: {str(e)}")
+            cart_result["error"] = f"Navigation error: {str(e)}"
+            return cart_result
+            
+    except Exception as e:
+        logger.error(f"Error in automatic cart process: {str(e)}")
+        if page:
+            await take_screenshot(page, "automatic_cart_error.png")
+        cart_result["error"] = f"Error in automatic cart process: {str(e)}"
+        return cart_result
+        
+    finally:
+        if not persistent_browser:
+            # Close browser if not using persistent browser
+            if browser:
+                await browser.close()
+            if playwright:
+                await playwright.stop()
+
+async def monitor_tickets(event_urls=None, event_dates=None, discord_webhook_url=None, 
+                         check_interval=15, manual_mode=False, max_attempts=100, 
+                         test_mode=False, persistent_browser=True):
+    """
+    Monitor ticket availability for specified Bad Bunny concerts
+    
+    Args:
+        event_urls: Dictionary mapping event dates to event URLs
+        event_dates: List of event dates to monitor
+        discord_webhook_url: Discord webhook URL for notifications
+        check_interval: Interval between checks in seconds
+        manual_mode: Whether to run in manual mode with pauses between attempts
+        max_attempts: Maximum number of attempts before giving up
+        test_mode: Whether to run in test mode
+        persistent_browser: Whether to use a persistent browser instance
+    
+    Returns:
+        A dictionary with the final status and any cart/checkout URLs
+    """
+    # Initialize default values
+    if event_urls is None:
+        # Use default event URLs if none provided
+        event_urls = {
+            # FORMAT: 'YYYY-MM-DD': 'URL'
+            # July 2025
+            '2025-07-12': '',
+            '2025-07-18': '',
+            '2025-07-19': '',
+            # August 2025
+            '2025-08-01': '',
+            '2025-08-02': '',
+            '2025-08-03': '',
+            '2025-08-08': '',
+            '2025-08-09': '',
+            '2025-08-10': '',
+            '2025-08-15': '',
+            '2025-08-16': '',
+            '2025-08-17': '',
+            '2025-08-22': '',
+            '2025-08-23': '',
+            '2025-08-24': '',
+            '2025-08-29': '',
+            '2025-08-30': '',
+            '2025-08-31': '',
+            # September 2025
+            '2025-09-05': '',
+            '2025-09-06': '',
+            '2025-09-07': '',
+            '2025-09-12': '',
+            '2025-09-13': '',
+            '2025-09-14': '',
+            # Test URL (always use this for testing)
+            '2025-03-10-TEST': 'https://shop.ticketera.com/checkout/como-coco-ikmk2p?_gl=1*nkwzt0*_gcl_au*MTc5Nzk3NjMzOC4xNzM2Nzg3MDg4'
+        }
+    
+    # If in test mode, only use the test URL
+    if test_mode:
+        event_urls = {'2025-03-10-TEST': event_urls.get('2025-03-10-TEST', 'https://shop.ticketera.com/checkout/como-coco-ikmk2p?_gl=1*nkwzt0*_gcl_au*MTc5Nzk3NjMzOC4xNzM2Nzg3MDg4')}
+    
+    # Use the specified webhook URL or a default one
+    if discord_webhook_url is None:
+        discord_webhook_url = "https://discord.com/api/webhooks/1347702022039666783/IIgJ2B6vT5aQoTjNOadVxdAviHuEsCRR8zwu4CgWAvWzcob9BJ0_5XQC-BTyVauTljR_"
+    
+    # Print initialization message
+    print("\n==================================================")
+    print(f"{'TOVK BAND AUTOMATED TICKET CART SYSTEM':^50}")
+    print("="*50 + "\n")
+
+    print("This script will automatically:")
+    print("1. Navigate to the ticket selection page")
+    print("2. Select available seats")
+    print("3. Select 2 tickets")
+    print("4. Choose 'Best Available' seats (if available)")
+    print("5. Add tickets to the cart")
+    print("7. Send a Discord notification with:")
+    print("   - @everyone mention")
+    print("   - Event date, quantity, and section")
+    print("   - Cart link as a button")
+    print("   - Clear checkout instructions")
+    print("   - Timestamp\n")
+    
+    if manual_mode:
+        print("Running in MANUAL MODE - will pause for 10 seconds between attempts")
+        print("Press Ctrl+C during the pause to continue immediately\n")
+    else:
+        print(f"Running in AUTO MODE - will check every {check_interval} seconds")
+        print("Press Ctrl+C to stop the script at any time\n")
+    
+    # Initialize result dictionary
+    result = {
+        'success': False,
+        'cart_url': '',
+        'checkout_url': '',
+        'error': ''
+    }
+    
+    # Initialize Playwright and launch browser if using persistent browser
+    if persistent_browser:
+        print("\nLaunching browser for persistent session...")
+        playwright = await async_playwright().start()
+        
+        # Define enhanced browser launch options for better stealth
+        browser_launch_options = {
+            "headless": False,  # Use headed mode for manual interaction
+            "channel": "chrome",  # Use Chrome channel which is less likely to be detected
+            "args": [
+                "--no-sandbox",
+                "--disable-setuid-sandbox",
+                "--disable-infobars",
+                "--window-size=1920,1080",
+                "--start-maximized",
+                "--disable-extensions",
+                "--disable-blink-features=IsolateOrigins,site-per-process",
+                "--ignore-certificate-errors",
+                "--disable-web-security",
+                "--allow-running-insecure-content",
+                "--disable-features=IsolateOrigins",
+                "--disable-site-isolation-trials"
+            ],
+            "ignore_default_args": ["--enable-automation"]
         }
         
-        # Send the notification
-        headers = {'Content-Type': 'application/json'}
-        response = requests.post(webhook_url, json=message, headers=headers)
+        # Launch browser with enhanced options
+        browser = await playwright.chromium.launch(**browser_launch_options)
         
-        if response.status_code == 204:
-            logger.info("Discord notification sent successfully")
+        # Create context with human-like properties
+        user_agent = random.choice([
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:124.0) Gecko/20100101 Firefox/124.0",
+            "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15"
+        ])
+        
+        context = await browser.new_context(
+            user_agent=user_agent,
+            locale="en-US",
+            timezone_id="America/New_York",
+            geolocation={"latitude": 40.7128, "longitude": -74.0060},
+            permissions=["geolocation"],
+            color_scheme="light"
+        )
+        
+        # Configure the browser for Cloudflare evasion
+        logger.info("Configuring browser to avoid Cloudflare detection...")
+        await configure_browser_for_cloudflare(browser)
+        logger.info("Persistent browser launched and ready")
+    else:
+        playwright = None
+        browser = None
+        context = None
+    
+    attempt = 1
+    
+    # Main monitoring loop
+    while attempt <= max_attempts:
+        if attempt == 1:
+            print("\nReady to start next attempt. Waiting 10 seconds...")
+            await wait_with_countdown(10)
+        
+        print(f"\nAttempt {attempt} of {max_attempts}")
+        
+        # Pick a random event date to check
+        random_date = random.choice(list(event_urls.keys()))
+        event_url = event_urls[random_date]
+        
+        logger.info(f"Selected event date: {random_date}")
+        logger.info(f"Using event URL: {event_url}")
+        
+        # Set options for automatic cart
+        options = {
+            "quantity": 2,
+            "auto_checkout": False,
+            "best_available": True,
+            "event_date": "Bad Bunny Test Event" if "TEST" in random_date else f"Bad Bunny {random_date}"
+        }
+        
+        logger.info(f"Using options: quantity={options['quantity']}, auto_checkout={options['auto_checkout']}, best_available={options['best_available']}")
+        
+        # Run automatic cart process
+        logger.info(f"Starting automatic carting process for: {event_url}")
+        
+        # If using persistent browser, create a new page in the existing context
+        if persistent_browser and context:
+            page = await context.new_page()
+            try:
+                # Open URL in the persistent browser
+                await page.goto(event_url, timeout=30000, wait_until="domcontentloaded")
+                
+                # Check for Cloudflare challenge
+                cloudflare_result = await handle_cloudflare_challenge(page, max_wait_time=90, manual_solve=True)
+                if not cloudflare_result:
+                    logger.error("Could not bypass Cloudflare protection")
+                    await page.close()
+                    
+                    if manual_mode:
+                        print("\nReady to start next attempt. Waiting 10 seconds...")
+                        await wait_with_countdown(10)
+                    else:
+                        await asyncio.sleep(check_interval)
+                    
+                    attempt += 1
+                    continue
+                
+                # Proceed with cart process
+                cart_result = await automatic_cart_with_page(page, options)
+                await page.close()
+            except Exception as e:
+                logger.error(f"Error in persistent browser session: {str(e)}")
+                await page.close()
+                cart_result = {
+                    "success": False,
+                    "error": f"Error in persistent browser session: {str(e)}",
+                    "cart_url": "",
+                    "checkout_url": ""
+                }
         else:
-            logger.warning(f"Failed to send Discord notification: {response.status_code} {response.text}")
+            # Use non-persistent browser approach
+            cart_result = await automatic_cart(event_url, options)
+        
+        # Check if cart process was successful
+        if cart_result.get("success", False):
+            logger.info("🎉 Successfully added tickets to cart!")
             
+            # Send Discord notification
+            if discord_webhook_url:
+                await send_discord_cart_notification(
+                    discord_webhook_url,
+                    cart_result.get("event_date", random_date),
+                    cart_result.get("quantity", 2),
+                    cart_result.get("section", "Unknown"),
+                    cart_result.get("row", "Unknown"),
+                    cart_result.get("seats", []),
+                    cart_result.get("price", "Unknown"),
+                    cart_result.get("cart_url", ""),
+                    cart_result.get("checkout_url", "")
+                )
+            
+            # Update the result with cart information
+            result = cart_result
+            
+            # If in manual mode, keep the browser open for the user
+            if manual_mode and persistent_browser:
+                print("\nKeeping browser open. You can continue to use it.")
+                await wait_for_manual_trigger()
+            
+            return result
+        
+        # If not successful, wait and try again
+        attempt += 1
+        
+        if attempt <= max_attempts:
+            if manual_mode:
+                print("\nReady to start next attempt. Waiting 10 seconds...")
+                await wait_with_countdown(10)
+            else:
+                # Wait for the specified interval before next check
+                await asyncio.sleep(check_interval)
+        else:
+            print("\n" + "="*50)
+            print(f"{'MAXIMUM ATTEMPTS REACHED':^50}")
+            print("="*50)
+            print("Unable to add tickets to cart after maximum attempts.")
+            print("Please try again later or check the event status.")
+    
+    # Clean up if using persistent browser
+    if persistent_browser and browser:
+        print("\nAll attempts completed but keeping browser open.")
+        print("Press Ctrl+C to close the browser and exit the script.")
+        await wait_for_manual_trigger()
+    else:
+        return {
+            'success': False,
+            'error': 'Maximum attempts reached without success',
+            'cart_url': '',
+            'checkout_url': ''
+        }
+
+async def automatic_cart_with_page(page, options=None):
+    """
+    Automate the process of selecting seats and adding them to cart using an existing page
+    
+    Args:
+        page: Playwright page instance
+        options: Dictionary containing options like quantity, auto_checkout, best_available
+    
+    Returns:
+        Dictionary with cart details or error information
+    """
+    options = options or {}
+    quantity = options.get("quantity", 2)
+    auto_checkout = options.get("auto_checkout", False)
+    best_available = options.get("best_available", True)
+    
+    # Initialize result dictionary
+    cart_result = {
+        "success": False,
+        "error": "",
+        "cart_url": "",
+        "checkout_url": "",
+        "section": "",
+        "row": "",
+        "seats": [],
+        "price": "",
+        "quantity": quantity,
+        "event_date": options.get("event_date", "Unknown")
+    }
+    
+    try:
+        logger.info(f"Options: quantity={quantity}, auto_checkout={auto_checkout}, best_available={best_available}")
+        
+        logger.info("Step 1: Opening event page...")
+        # Take screenshot of initial page load
+        await take_screenshot(page, "01_event_page.png")
+        
+        # Wait for the page to fully load after potential Cloudflare challenge
+        await page.wait_for_load_state("networkidle")
+        
+        # Add random delays and mouse movements to appear more human-like
+        await asyncio.sleep(random.uniform(1.0, 2.5))
+        
+        # Perform random mouse movements and scrolls
+        for _ in range(3):
+            x = random.randint(100, int(page.viewport_size['width'] - 100))
+            y = random.randint(100, int(page.viewport_size['height'] - 100))
+            await page.mouse.move(x, y, steps=random.randint(5, 10))
+            await asyncio.sleep(random.uniform(0.2, 0.5))
+        
+        # Random small scroll
+        await page.mouse.wheel(0, random.randint(100, 300))
+        await asyncio.sleep(random.uniform(0.5, 1.0))
+        
+        # Step 2: Try to select best available seats first if option is enabled
+        if best_available:
+            logger.info("Attempting to select best available seats...")
+            best_seats_selected = await select_best_available(page, quantity)
+            
+            if best_seats_selected:
+                logger.info("Best available seats selected successfully")
+            else:
+                logger.info("Best available selection failed or not available, trying seat map...")
+                # Try to select from seat map as fallback
+                seat_result = await select_seat_from_map(page)
+                if not seat_result:
+                    cart_result["error"] = "Failed to select seats from map"
+                    return cart_result
+        
+        # Step 3: Set quantity if not already done
+        await asyncio.sleep(random.uniform(0.5, 1.0))
+        await set_quantity(page, quantity)
+        
+        # Step 4: Add to cart
+        logger.info("Step 4: Adding tickets to cart...")
+        add_to_cart_result = await add_to_cart(page)
+        
+        # Update result with cart information
+        cart_result.update(add_to_cart_result)
+        
+        if add_to_cart_result.get("success", False):
+            logger.info("✅ Successfully added tickets to cart!")
+            
+            # Capture final page state
+            await take_screenshot(page, "05_tickets_in_cart.png")
+            
+            # Perform automatic checkout if enabled
+            if auto_checkout:
+                logger.info("Starting automatic checkout process...")
+                checkout_result = await proceed_to_checkout(page)
+                cart_result.update(checkout_result)
+        else:
+            logger.error(f"❌ Failed to add tickets to cart: {add_to_cart_result.get('error', 'Unknown error')}")
+        
+        return cart_result
+        
     except Exception as e:
-        logger.error(f"Error sending Discord notification: {str(e)}")
+        logger.error(f"Error in automatic cart process: {str(e)}")
+        await take_screenshot(page, "automatic_cart_error.png")
+        cart_result["error"] = f"Error in automatic cart process: {str(e)}"
+        return cart_result
