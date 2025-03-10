@@ -765,129 +765,117 @@ async def navigate_to_checkout(page):
 async def select_seat_from_map(page):
     """
     Function to specifically handle seat selection from a seat map interface
+    
+    Steps:
+    1. Wait for seat map to fully load
+    2. Identify available seats (blue or green circles)
+    3. Click on available seat
+    4. Handle pop-up with seat details
+    5. Confirm selection
     """
-    logger.info("Attempting to select seats from seat map...")
-    await take_screenshot(page, "seat_map_initial.png")
+    logger.info("Step 2: Selecting available seats from the map...")
     
-    # Try to identify if we're on a seat map page
-    seat_map_indicators = [
-        "div.seat-map",
-        "div[class*='seat-map']", 
-        "div.venue-map",
-        "div[class*='venue-map']", 
-        "svg[class*='seat']", 
-        "svg[class*='map']", 
-        ".seat-selection", 
-        ".map-container"
-    ]
-    
-    seat_map_found = False
-    for selector in seat_map_indicators:
-        try:
-            map_element = await page.query_selector(selector)
-            if map_element:
-                logger.info(f"Seat map found with selector: {selector}")
-                seat_map_found = True
-                break
-        except Exception as e:
-            logger.debug(f"Error checking for seat map with selector {selector}: {str(e)}")
-    
-    if not seat_map_found:
-        logger.info("No seat map detected on page")
-        return False
+    try:
+        # Wait for the seat map to fully load
+        logger.info("Waiting for seat map to load completely...")
+        # Give extra time for the seat map JavaScript to initialize
+        await asyncio.sleep(5)
+        await page.wait_for_load_state("networkidle")
         
-    # First try to find and click on seats that appear to be available (typically green)
-    available_seat_selectors = [
-        "svg circle[fill='green'], svg circle[fill='#00FF00'], svg circle[fill='#008000']",
-        "svg .seat[fill='green'], svg .seat[fill='#00FF00'], svg .seat[fill='#008000']",
-        "svg circle.available-seat, svg circle.available, svg circle:not(.unavailable-seat)",
-        "svg .seat.available-seat, svg .seat.available, svg .seat:not(.unavailable)",
-        "svg rect[fill='green'], svg rect[fill='#00FF00'], svg rect[fill='#008000']",
-        "svg path[fill='green'], svg path[fill='#00FF00'], svg path[fill='#008000']",
-        ".row-seat:not(.unavailable), .row-seat.available",
-        ".seat-map rect:not(.unavailable), .seat-map rect.available",
-        ".seat-map circle:not(.unavailable), .seat-map circle.available"
-    ]
-    
-    seats_selected = False
-    for selector in available_seat_selectors:
-        try:
-            available_seats = await page.query_selector_all(selector)
-            if len(available_seats) > 0:
-                logger.info(f"Found {len(available_seats)} available seats with selector: {selector}")
-                
-                # Get the first 1-2 available seats (based on quantity)
-                max_seats = min(2, len(available_seats))
-                for i in range(max_seats):
-                    await available_seats[i].scroll_into_view_if_needed()
-                    await available_seats[i].click()
-                    logger.info(f"Clicked on seat {i+1} with selector: {selector}")
-                    await take_screenshot(page, f"seat_selected_{i+1}.png")
-                    await asyncio.sleep(1)
-                
-                seats_selected = True
-                break
-        except Exception as e:
-            logger.debug(f"Failed to select seats with selector {selector}: {str(e)}")
-    
-    # If no specific seat elements found, try clicking on positions in the seat map
-    if not seats_selected:
-        try:
-            # Try to find the seat map container first
-            seat_map_container = None
-            for selector in seat_map_indicators:
-                try:
-                    container = await page.query_selector(selector)
-                    if container:
-                        seat_map_container = container
-                        break
-                except Exception:
-                    pass
+        # Look for available seats (blue or green circles)
+        logger.info("Looking for available seats (blue or green circles)...")
+        
+        # Try to find blue seats first
+        blue_seats_selector = "circle[fill='#4a89dc'], circle[fill='#5D9CEC'], circle[fill='#4FC1E9'], circle[fill='#48CFAD']"
+        green_seats_selector = "circle[fill='#A0D468'], circle[fill='#8CC152'], circle[fill='#2ECC71'], circle[fill='#37BC9B']"
+        
+        # Check if blue seats exist
+        blue_seats_exist = await page.query_selector(blue_seats_selector) is not None
+        green_seats_exist = await page.query_selector(green_seats_selector) is not None
+        
+        logger.info(f"Blue seats available: {blue_seats_exist}")
+        logger.info(f"Green seats available: {green_seats_exist}")
+        
+        # Priority for blue seats (usually cheaper)
+        if blue_seats_exist:
+            logger.info("Blue seats found - attempting to select...")
+            seat_selector = blue_seats_selector
+        elif green_seats_exist:
+            logger.info("Green seats found - attempting to select...")
+            seat_selector = green_seats_selector
+        else:
+            logger.warning("No available seats (blue or green) found on the map")
+            await take_screenshot(page, "no_available_seats.png")
+            return False
             
-            if seat_map_container:
-                # Get the bounding box of the seat map
-                bbox = await seat_map_container.bounding_box()
-                if bbox:
-                    logger.info(f"Found seat map container with dimensions: {bbox}")
+        # Try to get the first 5 available seats
+        available_seats = await page.query_selector_all(seat_selector)
+        logger.info(f"Found {len(available_seats)} available seats")
+        
+        if not available_seats:
+            logger.warning("No seats available despite selector finding matches")
+            return False
+            
+        # Try to select a seat (choosing one from the middle of the list for better positioning)
+        seat_index = min(len(available_seats) // 2, len(available_seats) - 1)
+        selected_seat = available_seats[seat_index]
+        
+        # Scroll into view and take a screenshot before clicking
+        await selected_seat.scroll_into_view_if_needed()
+        await human_delay()
+        await take_screenshot(page, "02_seat_selected.png")
+        
+        # Click the seat
+        await selected_seat.click()
+        logger.info("Clicked on seat")
+        await human_delay()
+        
+        # Wait for the pop-up with seat details
+        logger.info("Step 3: Waiting for seat details pop-up...")
+        # Look for pop-up elements like section, row, seat number, and price
+        popup_selector = "div.modal-content, div.seat-details-popup, div[role='dialog']"
+        
+        # Wait for the popup to appear
+        try:
+            await page.wait_for_selector(popup_selector, timeout=10000)
+            logger.info("Seat details pop-up appeared")
+            await take_screenshot(page, "seat_details_popup.png")
+            
+            # Find and click the "Select Now" or confirmation button
+            select_button_selectors = [
+                "button:has-text('Select Now')",
+                "button:has-text('Select')",
+                "button:has-text('Confirm')",
+                "button.btn-primary",
+                "button.seat-select-button"
+            ]
+            
+            for select_button_selector in select_button_selectors:
+                if await page.query_selector(select_button_selector) is not None:
+                    await page.click(select_button_selector)
+                    logger.info(f"Clicked {select_button_selector} to confirm seat selection")
+                    await human_delay()
+                    await take_screenshot(page, "seat_confirmation.png")
+                    return True
                     
-                    # Click in different areas of the seat map where seats might be
-                    click_positions = [
-                        (bbox['x'] + bbox['width'] * 0.3, bbox['y'] + bbox['height'] * 0.3),  # Upper left quadrant
-                        (bbox['x'] + bbox['width'] * 0.7, bbox['y'] + bbox['height'] * 0.3),  # Upper right quadrant
-                        (bbox['x'] + bbox['width'] * 0.3, bbox['y'] + bbox['height'] * 0.7),  # Lower left quadrant
-                        (bbox['x'] + bbox['width'] * 0.7, bbox['y'] + bbox['height'] * 0.7)   # Lower right quadrant
-                    ]
-                    
-                    for i, (x, y) in enumerate(click_positions):
-                        await page.mouse.click(x, y)
-                        logger.info(f"Clicked at position ({x:.1f}, {y:.1f}) in seat map")
-                        await take_screenshot(page, f"seat_map_click_{i+1}.png")
-                        await asyncio.sleep(2)
-                        
-                        # Check if a seat selection confirmation dialog appeared
-                        for confirm_selector in ["button:has-text('Confirm')", "button:has-text('Confirmar')", "button.confirm", ".confirm-button", "button.btn-primary"]:
-                            try:
-                                confirm_button = await page.query_selector(confirm_selector)
-                                if confirm_button:
-                                    await confirm_button.click()
-                                    logger.info(f"Clicked confirm button with selector: {confirm_selector}")
-                                    await take_screenshot(page, "seat_confirmation.png")
-                                    await asyncio.sleep(2)
-                                    seats_selected = True
-                                    break
-                            except Exception:
-                                pass
-                        
-                        if seats_selected:
-                            break
+            logger.warning("Could not find any seat confirmation button")
+            await take_screenshot(page, "seat_confirmation_not_found.png")
+            return False
+            
         except Exception as e:
-            logger.debug(f"Error when trying to click on seat map areas: {str(e)}")
-    
-    return seats_selected
+            logger.error(f"Error waiting for seat pop-up: {str(e)}")
+            await take_screenshot(page, "seat_popup_error.png")
+            return False
+            
+    except Exception as e:
+        logger.error(f"Error selecting seat from map: {str(e)}")
+        logger.error(traceback.format_exc())
+        await take_screenshot(page, "seat_selection_error.png")
+        return False
 
 async def automatic_cart_process(page, event_url, options=None):
     """
-    Attempt to automatically add tickets to the cart
+    Attempt to automatically add tickets to the cart following Ticketera's specific flow
     
     Args:
         page: Playwright page object
@@ -900,142 +888,152 @@ async def automatic_cart_process(page, event_url, options=None):
     Returns:
         Dictionary with cart results
     """
-    # Set default options if none provided
-    if options is None:
-        options = {}
+    if not options:
+        options = {
+            "quantity": 2,
+            "auto_checkout": False,
+            "best_available": True
+        }
     
-    quantity = options.get('quantity', 2)
-    auto_checkout = options.get('auto_checkout', False)
-    best_available = options.get('best_available', True)
-    
-    logger.info(f"Starting automatic cart process for URL: {event_url}")
-    logger.info(f"Options: quantity={quantity}, auto_checkout={auto_checkout}, best_available={best_available}")
-    
-    # Initialize the result dictionary
     result = {
-        'success': False,
-        'quantity': quantity,
-        'event_url': event_url,
-        'cart_url': '',
-        'checkout_url': ''
+        "success": False,
+        "cart_url": None,
+        "tickets_carted": 0,
+        "screenshot": None,
+        "error": None
     }
     
     try:
-        # Step 1: Navigate to the event URL if not already there
-        if page.url != event_url:
-            logger.info(f"Navigating to event URL: {event_url}")
-            try:
-                await page.goto(event_url, timeout=30000)
-                await take_screenshot(page, "event_page_initial.png")
-                await page.wait_for_load_state("networkidle", timeout=10000)
-            except Exception as e:
-                logger.error(f"Error navigating to event URL: {str(e)}")
-                return result
+        # Step 1: Open the event page and wait for it to load
+        logger.info("Step 1: Opening event page...")
+        logger.info(f"Navigating to {event_url}")
         
-        # Step 2: Look for and click BOLETOS/Tickets button
-        # Give extra time for the page to fully load and stabilize
-        await asyncio.sleep(3)
-        boletos_clicked = await click_boletos_button(page)
+        await page.goto(event_url, wait_until='domcontentloaded')
+        await page.wait_for_load_state("networkidle")
+        await human_delay()
         
-        if not boletos_clicked:
-            logger.warning("Could not find or click BOLETOS button")
-            # We might already be on a tickets page, so continue...
-            await take_screenshot(page, "current_page_no_boletos.png")
-        else:
-            logger.info("Successfully clicked BOLETOS button")
-            await take_screenshot(page, "after_boletos_click.png")
-            # Wait for page to stabilize after BOLETOS click
-            await asyncio.sleep(3)
+        # Take screenshot of initial page
+        await take_screenshot(page, "01_initial_page.png")
         
-        # Step 3: Navigate to checkout page with quantity selection
-        # First check if we're on a seat map page and need to select seats
-        seat_map_detected = False
-        try:
-            # Check for seat map indicators
-            seat_map_indicators = [
-                "div.seat-map", "div[class*='seat-map']", 
-                "svg[class*='seat']", "svg[class*='map']",
-                ".seat-selection", ".map-container"
-            ]
-            
-            for selector in seat_map_indicators:
-                try:
-                    map_element = await page.query_selector(selector)
-                    if map_element:
-                        logger.info(f"Seat map detected with selector: {selector}")
-                        seat_map_detected = True
-                        break
-                except Exception:
-                    pass
-            
-            if seat_map_detected:
-                logger.info("Using seat map selection flow")
+        # Wait for the seat map to fully load
+        logger.info("Waiting for seat map to load completely...")
+        # Give extra time for the seat map JavaScript to initialize
+        await asyncio.sleep(5)
+        await page.wait_for_load_state("networkidle")
+        
+        # Step 2 & 3: Select seats from the map and confirm selection
+        seat_selected = await select_seat_from_map(page)
+        
+        if not seat_selected:
+            # Try an alternative method if seat map selection fails
+            logger.warning("Seat map selection failed, trying alternative methods...")
+            # Handle ticket selection alternatives if needed
+        
+        # Step 4: Proceed to checkout
+        logger.info("Step 4: Proceeding to checkout...")
+        
+        # Look for shopping cart area (usually right panel)
+        cart_selectors = [
+            "div.cart-container",
+            "div.shopping-cart",
+            "div.order-summary",
+            "div#cart",
+            "div.sidebar-cart"
+        ]
+        
+        cart_found = False
+        for cart_selector in cart_selectors:
+            if await page.query_selector(cart_selector) is not None:
+                logger.info(f"Found shopping cart using selector: {cart_selector}")
+                cart_found = True
+                break
                 
-                # Try our dedicated seat map selection function
-                seat_selection_result = await select_seat_from_map(page)
-                if seat_selection_result:
-                    logger.info("Successfully selected seats from seat map")
-                else:
-                    logger.warning("Failed to select seats from seat map, will try standard checkout flow")
-            else:
-                logger.info("No seat map detected, using standard checkout flow")
-        except Exception as e:
-            logger.error(f"Error checking for seat map: {str(e)}")
-        
-        # Continue with checkout flow 
-        logger.info("Proceeding with checkout navigation")
-        checkout_result = await navigate_to_checkout(page)
-        
-        if checkout_result and checkout_result.get('success'):
-            logger.info("Successfully navigated to checkout with tickets")
-        else:
-            logger.warning("Navigate to checkout did not report success")
+        if not cart_found:
+            logger.warning("Couldn't locate shopping cart on page")
+            await take_screenshot(page, "cart_not_found.png")
+            result["error"] = "Shopping cart not found on page"
+            return result
             
-        # Wait for page to stabilize
-        await asyncio.sleep(3)
-        await take_screenshot(page, "after_checkout_navigation.png")
+        # Look for "Proceed" button in the shopping cart
+        proceed_button_selectors = [
+            "button:has-text('Proceed')",
+            "button:has-text('Checkout')",
+            "button.checkout-button",
+            "button.proceed-button",
+            "a:has-text('Proceed')",
+            "a:has-text('Checkout')",
+            "a.checkout-button"
+        ]
         
-        # Step 4: Verify we're on a cart page
-        cart_verification = await verify_cart_page(page)
-        if cart_verification:
-            cart_url = page.url
-            logger.info(f"Successfully navigated to cart page at: {cart_url}")
-            result['cart_url'] = cart_url
+        proceed_clicked = False
+        for proceed_selector in proceed_button_selectors:
+            if await page.query_selector(proceed_selector) is not None:
+                await page.click(proceed_selector)
+                logger.info(f"Clicked {proceed_selector} to proceed to checkout")
+                proceed_clicked = True
+                await human_delay()
+                await take_screenshot(page, "04_proceed_clicked.png")
+                break
+                
+        if not proceed_clicked:
+            logger.warning("Couldn't find proceed/checkout button")
+            await take_screenshot(page, "proceed_button_not_found.png")
+            result["error"] = "Proceed button not found"
+            return result
             
-            # Extract cart details
+        # Wait for the checkout page to load
+        await page.wait_for_load_state("networkidle")
+        
+        # Step 5: Enter login information if needed
+        login_form_selectors = [
+            "form#login",
+            "form.login-form",
+            "div.login-container",
+            "input[type='email']"
+        ]
+        
+        for login_selector in login_form_selectors:
+            if await page.query_selector(login_selector) is not None:
+                logger.info("Login form detected")
+                await take_screenshot(page, "login_form.png")
+                # If auto-checkout is not enabled, we'll just get the cart URL
+                if not options["auto_checkout"]:
+                    break
+                # Otherwise, handle login if needed
+                
+        # Get the current cart URL - this is what we need to return for manual checkout
+        current_url = page.url
+        
+        if "cart" in current_url.lower() or "checkout" in current_url.lower():
+            logger.info(f"Successfully reached checkout page: {current_url}")
+            result["success"] = True
+            result["cart_url"] = current_url
+            
+            # Take a final screenshot of the cart/checkout page
+            await take_screenshot(page, "final_cart.png")
+            result["screenshot"] = "final_cart.png"
+            
+            # Extract number of tickets from cart (implementation will vary based on site structure)
             try:
-                cart_items = await page.query_selector_all("div.cart-item, div.line-item, [class*='cart-item']")
-                logger.info(f"Found {len(cart_items)} items in cart")
+                # This will need to be adjusted based on the actual page structure
+                cart_items = await page.query_selector_all("div.cart-item, tr.cart-item")
+                result["tickets_carted"] = len(cart_items)
+                logger.info(f"Found {result['tickets_carted']} tickets in cart")
             except Exception as e:
-                logger.warning(f"Error extracting cart details: {str(e)}")
-        
-        # If we haven't successfully found the cart page yet, check again
-        if not cart_verification:
-            cart_verification = await verify_cart_page(page)
-            if cart_verification:
-                cart_url = page.url
-                logger.info(f"Successfully navigated to cart page at: {cart_url}")
-                result['cart_url'] = cart_url
-        
-        # If successful, send a success notification
-        if cart_verification:
-            logger.info("Sending success notification")
-            await send_success_notification(cart_url, quantity)
-            result['success'] = True
-        
+                logger.warning(f"Could not determine exact ticket count: {str(e)}")
+                result["tickets_carted"] = options["quantity"]  # Assume requested quantity
+        else:
+            logger.warning(f"Failed to reach checkout page, current URL: {current_url}")
+            result["error"] = "Failed to reach checkout page"
+            await take_screenshot(page, "checkout_failed.png")
+            
         return result
+            
     except Exception as e:
-        logger.error(f"Error during automatic cart process: {str(e)}")
-        await take_screenshot(page, "error_screenshot.png")
-        
-        # Send a Discord notification about the error
-        await send_discord_notification({
-            'message': f"❌ Error during automatic carting: {str(e)}",
-            'error': str(e),
-            'mention_everyone': False,
-            'success': False
-        })
-        
+        logger.error(f"Error in automatic cart process: {str(e)}")
+        logger.error(traceback.format_exc())
+        result["error"] = str(e)
+        await take_screenshot(page, "automatic_cart_error.png")
         return result
 
 async def wait_for_user_action(page):
